@@ -2,142 +2,382 @@ import { BACKEND_URL } from "@/lib/config";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Bot, Loader2, Sparkles, User } from "lucide-react";
+import {
+  Bot,
+  Loader2,
+  Sparkles,
+  User,
+  CheckCircle2,
+  AlertTriangle,
+  Award,
+  Code2,
+  Brain,
+  MessageSquare,
+  Layers,
+  Quote,
+  ArrowLeft,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
+interface CategoryScore {
+  score: number;
+  feedback: string;
+}
+
+interface EvidenceItem {
+  quote: string;
+  assessment: string;
+}
+
+interface EvaluationData {
+  overallScore: number;
+  recommendation: "Strong Hire" | "Hire" | "Lean Hire" | "No Hire";
+  summary: string;
+  categories: {
+    technicalAccuracy: CategoryScore;
+    problemSolving: CategoryScore;
+    communication: CategoryScore;
+    depth: CategoryScore;
+  };
+  strengths: string[];
+  improvements: string[];
+  evidence: EvidenceItem[];
+}
+
 interface ResultData {
-    transcript: { type: "Assistant" | "User"; content: string; createdAt: string }[];
-    score: number;
-    feedback: string;
-    status: "Done" | "InProgress" | "Pre";
+  id?: string;
+  score: number;
+  feedback: string;
+  evaluationData?: EvaluationData;
+  transcript: { type: "Assistant" | "User"; content: string; createdAt: string }[];
+  status: string;
 }
 
 export function Result() {
-    const { interviewId } = useParams();
-    const navigate = useNavigate();
-    const [result, setResult] = useState<ResultData>({
-        score: 0,
-        feedback: "",
-        transcript: [],
-        status: "Pre",
-    });
+  const { interviewId } = useParams();
+  const navigate = useNavigate();
+  const [result, setResult] = useState<ResultData>({
+    score: 0,
+    feedback: "",
+    transcript: [],
+    status: "EVALUATING",
+  });
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchResult = () =>
-            axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`).then((response) => {
-                setResult(response.data);
-                return response.data.status as ResultData["status"];
-            });
+  useEffect(() => {
+    let intervalId: any = null;
 
-        fetchResult();
-        const intervalId = setInterval(async () => {
-            const s = await fetchResult();
-            if (s === "Done") clearInterval(intervalId);
-        }, 5000);
+    const fetchResult = async () => {
+      try {
+        const response = await axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`);
+        const data = response.data;
+        setResult(data);
 
-        return () => clearInterval(intervalId);
-    }, [interviewId]);
+        if (data.status === "COMPLETED" || data.status === "Done") {
+          setLoading(false);
+          if (intervalId) clearInterval(intervalId);
+        }
+      } catch (err) {
+        console.error("Error fetching results:", err);
+      }
+    };
 
-    const ready = result.status === "Done";
+    fetchResult();
+    intervalId = setInterval(fetchResult, 3000);
 
-    return (
-        <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-12">
-            <header className="mb-10 flex items-center justify-between">
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [interviewId]);
+
+  const ready = result.status === "COMPLETED" || result.status === "Done";
+  const evalData = result.evaluationData;
+
+  const getRecommendationBadge = (rec?: string) => {
+    switch (rec) {
+      case "Strong Hire":
+        return {
+          bg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+          label: "Strong Hire",
+        };
+      case "Hire":
+        return {
+          bg: "bg-teal-500/15 border-teal-500/30 text-teal-400",
+          label: "Hire",
+        };
+      case "Lean Hire":
+        return {
+          bg: "bg-amber-500/15 border-amber-500/30 text-amber-400",
+          label: "Lean Hire",
+        };
+      default:
+        return {
+          bg: "bg-rose-500/15 border-rose-500/30 text-rose-400",
+          label: rec || "Evaluation Complete",
+        };
+    }
+  };
+
+  const recBadge = getRecommendationBadge(evalData?.recommendation);
+
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-12">
+      <header className="mb-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-full">
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Interview Evaluation</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Powered by Gemini 3.6 Flash technical evaluation rubric.
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" onClick={() => navigate("/")}>
+          New interview
+        </Button>
+      </header>
+
+      {!ready ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-card/40 py-28 text-center backdrop-blur">
+          <div className="grid size-14 place-items-center rounded-2xl bg-secondary/80 text-violet-400">
+            <Loader2 className="size-7 animate-spin" />
+          </div>
+          <div>
+            <p className="text-base font-semibold">Analyzing interview transcript…</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Gemini 3.6 Flash is evaluating technical accuracy, problem solving, and depth.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-8">
+          {/* Executive Summary Card */}
+          <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card/90 to-card/40 p-7 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="grid size-11 place-items-center rounded-xl bg-violet-500/15 text-violet-400">
+                  <Award className="size-6" />
+                </div>
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Interview results</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Your feedback and full conversation transcript.
-                    </p>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-lg font-bold">Overall Assessment</h2>
+                    {evalData?.recommendation && (
+                      <span className={cn("rounded-full border px-3 py-0.5 text-xs font-semibold", recBadge.bg)}>
+                        {recBadge.label}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Automated candidate scorecard</p>
                 </div>
-                <Button variant="outline" onClick={() => navigate("/")}>
-                    New interview
-                </Button>
-            </header>
+              </div>
 
-            {!ready ? (
-                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card/50 py-24 text-center">
-                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
-                    <div>
-                        <p className="font-medium">Analyzing your interview…</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            This usually takes a few seconds.
-                        </p>
+              <div className="flex items-baseline gap-1.5 self-start sm:self-auto">
+                <span className="text-4xl font-extrabold tracking-tight text-foreground">
+                  {evalData?.overallScore ?? result.score}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">/ 10</span>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-border/50 bg-secondary/30 p-4">
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {evalData?.summary || result.feedback}
+              </p>
+            </div>
+          </section>
+
+          {/* 4 Category Score Cards */}
+          {evalData?.categories && (
+            <section className="grid gap-4 sm:grid-cols-2">
+              {/* Technical Accuracy */}
+              <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-8 place-items-center rounded-lg bg-blue-500/15 text-blue-400">
+                      <Code2 className="size-4" />
                     </div>
+                    <h3 className="text-sm font-semibold">Technical Accuracy</h3>
+                  </div>
+                  <span className="text-base font-bold text-foreground">
+                    {evalData.categories.technicalAccuracy.score}
+                    <span className="text-xs font-normal text-muted-foreground">/10</span>
+                  </span>
                 </div>
-            ) : (
-                <div className="flex flex-col gap-8">
-                    {/* Score + feedback */}
-                    <section className="rounded-xl border border-border bg-card/60 p-6 backdrop-blur">
-                        <div className="flex items-start justify-between gap-6">
-                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                <Sparkles className="size-4 text-violet-400" />
-                                AI Feedback
-                            </div>
-                            <div className="flex shrink-0 items-baseline gap-1">
-                                <span className="text-3xl font-bold tracking-tight">
-                                    {result.score}
-                                </span>
-                                <span className="text-sm text-muted-foreground">/ 10</span>
-                            </div>
-                        </div>
-                        <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                            {result.feedback}
-                        </p>
-                    </section>
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {evalData.categories.technicalAccuracy.feedback}
+                </p>
+              </div>
 
-                    {/* Transcript */}
-                    <section>
-                        <h2 className="mb-4 text-sm font-medium text-muted-foreground">
-                            Conversation
-                        </h2>
-                        <div className="flex flex-col gap-4">
-                            {result.transcript.length === 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                    No messages were recorded for this interview.
-                                </p>
-                            )}
-                            {result.transcript.map((m, i) => {
-                                const isAi = m.type === "Assistant";
-                                return (
-                                    <div
-                                        key={i}
-                                        className={cn(
-                                            "flex gap-3",
-                                            isAi ? "justify-start" : "flex-row-reverse",
-                                        )}
-                                    >
-                                        <div
-                                            className={cn(
-                                                "grid size-8 shrink-0 place-items-center rounded-full text-white",
-                                                isAi
-                                                    ? "bg-gradient-to-br from-violet-400 to-indigo-600"
-                                                    : "bg-gradient-to-br from-emerald-300 to-teal-600",
-                                            )}
-                                        >
-                                            {isAi ? (
-                                                <Bot className="size-4" />
-                                            ) : (
-                                                <User className="size-4" />
-                                            )}
-                                        </div>
-                                        <div
-                                            className={cn(
-                                                "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                                                isAi
-                                                    ? "rounded-tl-sm bg-card text-foreground"
-                                                    : "rounded-tr-sm bg-primary text-primary-foreground",
-                                            )}
-                                        >
-                                            {m.content}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </section>
+              {/* Problem Solving */}
+              <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-8 place-items-center rounded-lg bg-amber-500/15 text-amber-400">
+                      <Brain className="size-4" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Problem Solving</h3>
+                  </div>
+                  <span className="text-base font-bold text-foreground">
+                    {evalData.categories.problemSolving.score}
+                    <span className="text-xs font-normal text-muted-foreground">/10</span>
+                  </span>
                 </div>
-            )}
-        </main>
-    );
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {evalData.categories.problemSolving.feedback}
+                </p>
+              </div>
+
+              {/* Communication */}
+              <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-8 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                      <MessageSquare className="size-4" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Communication</h3>
+                  </div>
+                  <span className="text-base font-bold text-foreground">
+                    {evalData.categories.communication.score}
+                    <span className="text-xs font-normal text-muted-foreground">/10</span>
+                  </span>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {evalData.categories.communication.feedback}
+                </p>
+              </div>
+
+              {/* Depth */}
+              <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-8 place-items-center rounded-lg bg-purple-500/15 text-purple-400">
+                      <Layers className="size-4" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Engineering Depth</h3>
+                  </div>
+                  <span className="text-base font-bold text-foreground">
+                    {evalData.categories.depth.score}
+                    <span className="text-xs font-normal text-muted-foreground">/10</span>
+                  </span>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {evalData.categories.depth.feedback}
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* Strengths & Improvements */}
+          {evalData && (
+            <section className="grid gap-6 sm:grid-cols-2">
+              {/* Strengths */}
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
+                  <CheckCircle2 className="size-4" />
+                  Key Strengths
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {evalData.strengths.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90">
+                      <span className="mt-1 size-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Improvements */}
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+                  <AlertTriangle className="size-4" />
+                  Areas for Improvement
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {evalData.improvements.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90">
+                      <span className="mt-1 size-1.5 shrink-0 rounded-full bg-amber-400" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {/* Transcript Evidence Quotes */}
+          {evalData?.evidence && evalData.evidence.length > 0 && (
+            <section className="rounded-xl border border-border/60 bg-card/40 p-6 backdrop-blur">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Quote className="size-4 text-violet-400" />
+                Transcript Evidence & Observations
+              </div>
+              <div className="mt-4 space-y-3">
+                {evalData.evidence.map((ev, idx) => (
+                  <div key={idx} className="rounded-lg border border-border/40 bg-secondary/30 p-3.5">
+                    <p className="text-xs font-medium italic text-foreground/90">
+                      "{ev.quote}"
+                    </p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      <span className="font-semibold text-violet-300">Observation: </span>
+                      {ev.assessment}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Full Chronological Transcript */}
+          <section>
+            <h2 className="mb-4 text-sm font-semibold text-muted-foreground">
+              Full Conversation Transcript ({result.transcript.length} messages)
+            </h2>
+            <div className="flex flex-col gap-4">
+              {result.transcript.length === 0 && (
+                <div className="rounded-xl border border-border bg-card/30 p-8 text-center text-sm text-muted-foreground">
+                  No conversation messages recorded.
+                </div>
+              )}
+              {result.transcript.map((m, i) => {
+                const isAi = m.type === "Assistant";
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex gap-3",
+                      isAi ? "justify-start" : "flex-row-reverse"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "grid size-8 shrink-0 place-items-center rounded-full text-white shadow-sm",
+                        isAi
+                          ? "bg-gradient-to-br from-violet-400 to-indigo-600"
+                          : "bg-gradient-to-br from-emerald-300 to-teal-600"
+                      )}
+                    >
+                      {isAi ? <Bot className="size-4" /> : <User className="size-4" />}
+                    </div>
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+                        isAi
+                          ? "rounded-tl-sm border border-border/50 bg-card text-foreground"
+                          : "rounded-tr-sm bg-primary text-primary-foreground"
+                      )}
+                    >
+                      {m.content}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+    </main>
+  );
 }

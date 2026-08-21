@@ -1,230 +1,326 @@
-import { BACKEND_URL } from "@/lib/config";
-import axios from "axios";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Bot, Loader2, PhoneOff, User } from "lucide-react";
+import { Bot, Loader2, PhoneOff, User, Mic, Volume2, AlertCircle, Play } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
+import { getBackendWsUrl } from "@/lib/config";
+import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
 
-type Status = "connecting" | "live" | "ending";
-
-/** Attaches an analyser to a stream and returns a getter for its current 0..1 volume level. */
-function createLevelMeter(ctx: AudioContext, stream: MediaStream) {
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.8;
-    source.connect(analyser);
-    const data = new Uint8Array(analyser.fftSize);
-
-    return () => {
-        analyser.getByteTimeDomainData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) {
-            const v = (data[i]! - 128) / 128;
-            sum += v * v;
-        }
-        const rms = Math.sqrt(sum / data.length);
-        // Boost and clamp so normal speech fills most of the range.
-        return Math.min(1, rms * 3.2);
-    };
-}
+type Status = "idle" | "connecting" | "live" | "ending" | "error";
 
 export function Interview() {
-    const { interviewId } = useParams();
-    const navigate = useNavigate();
+  const { interviewId } = useParams();
+  const navigate = useNavigate();
 
-    const [status, setStatus] = useState<Status>("connecting");
-    const [aiLevel, setAiLevel] = useState(0);
-    const [userLevel, setUserLevel] = useState(0);
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [aiLevel, setAiLevel] = useState(0);
+  const [userLevel, setUserLevel] = useState(0);
+  const [activeModel, setActiveModel] = useState<string>("gemini-3.1-flash-live-preview");
+  const [liveCaption, setLiveCaption] = useState<string>("");
 
-    // Resources we need to tear down on exit.
-    const pcRef = useRef<RTCPeerConnection | null>(null);
-    const socketRef = useRef<WebSocket | null>(null);
-    const recorderRef = useRef<MediaRecorder | null>(null);
-    const userStreamRef = useRef<MediaStream | null>(null);
-    const audioCtxRef = useRef<AudioContext | null>(null);
-    const rafRef = useRef<number | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const playerRef = useRef<LiveAudioPlayer | null>(null);
+  const recorderRef = useRef<LiveMicrophoneRecorder | null>(null);
+  const rafRef = useRef<number | null>(null);
 
-    useEffect(() => {
-        let cancelled = false;
+  // Initialize and start interview explicitly from user click
+  const joinInterview = async () => {
+    if (!interviewId) {
+      setStatus("error");
+      setErrorMessage("Missing interview ID");
+      return;
+    }
 
-        (async () => {
-            const pc = new RTCPeerConnection();
-            pcRef.current = pc;
+    setStatus("connecting");
+    setErrorMessage(null);
 
-            const audioCtx = new AudioContext();
-            audioCtxRef.current = audioCtx;
-            let aiMeter: (() => number) | null = null;
-            let userMeter: (() => number) | null = null;
+    try {
+      // 1. Create and warm up audio player directly in the user click gesture
+      const player = new LiveAudioPlayer();
+      player.warmUp();
+      playerRef.current = player;
 
-            // Play + meter the AI's audio.
-            const audioEl = document.createElement("audio");
-            audioEl.autoplay = true;
-            pc.ontrack = (e) => {
-                const stream = e.streams[0]!;
-                audioEl.srcObject = stream;
-                aiMeter = createLevelMeter(audioCtx, stream);
-            };
+      // 2. Open WebSocket
+      const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
+      const socket = new WebSocket(wsUrl);
+      socketRef.current = socket;
 
-            // Capture the user's microphone.
-            const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (cancelled) {
-                ms.getTracks().forEach((t) => t.stop());
-                return;
-            }
-            userStreamRef.current = ms;
-            userMeter = createLevelMeter(audioCtx, ms);
+      socket.onopen = () => {
+        console.log("[Interview] WebSocket connected to backend");
+      };
 
-            // Stream the mic to Deepgram for live transcription.
-            const socket = new WebSocket("wss://api.deepgram.com/v1/listen", [
-                "token",
-                //TODO: Lets create ephemereal api keys for the user and not put the prod key on the frontend
-                "",
-            ]);
-            socketRef.current = socket;
+      socket.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
 
-            socket.onopen = () => {
-                const mediaRecorder = new MediaRecorder(ms, { mimeType: "audio/webm" });
-                recorderRef.current = mediaRecorder;
-                mediaRecorder.start(250);
-                mediaRecorder.addEventListener("dataavailable", (event) => {
-                    if (socket.readyState === WebSocket.OPEN) socket.send(event.data);
-                });
-            };
+          if (data.type === "ready") {
+            if (data.model) setActiveModel(data.model);
 
-            socket.onmessage = (message) => {
-                const received = JSON.parse(message.data);
-                const transcript = received.channel?.alternatives[0]?.transcript;
-                if (transcript) {
-                    axios.post(`${BACKEND_URL}/api/v1/session/user/response/${interviewId}`, {
-                        message: transcript,
-                    });
-                }
-            };
+            await player.resume();
 
-            pc.addTrack(ms.getTracks()[0]!);
-
-            // SDP handshake with the backend.
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            const sdpResponse = await fetch(`${BACKEND_URL}/api/v1/session/${interviewId}`, {
-                method: "POST",
-                body: offer.sdp,
-                headers: { "Content-Type": "application/sdp" },
+            // 3. Request and activate microphone
+            const recorder = new LiveMicrophoneRecorder((pcm) => {
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "audio", pcm }));
+              }
             });
-            const answer = { type: "answer" as const, sdp: await sdpResponse.text() };
-            await pc.setRemoteDescription(answer);
 
-            if (cancelled) return;
+            await recorder.start();
+            recorderRef.current = recorder;
+
             setStatus("live");
+          } else if (data.type === "audio" && data.pcm) {
+            player.enqueueChunk(data.pcm);
+          } else if (data.type === "interrupt") {
+            player.interrupt();
+          } else if (data.type === "transcript") {
+            if (data.text) {
+              setLiveCaption((prev) => {
+                const prefix = data.role === "user" ? "You: " : "Alex: ";
+                if (prev.startsWith(prefix)) {
+                  return (prev + data.text).slice(-200);
+                }
+                return (prefix + data.text).slice(-200);
+              });
+            }
+          } else if (data.type === "turnComplete") {
+            // Finished current speech turn
+          } else if (data.type === "error") {
+            console.error("[Interview] Backend error:", data.message);
+            setStatus("error");
+            setErrorMessage(data.message || "An error occurred with the live session.");
+          }
+        } catch (e) {
+          console.error("[Interview] Error parsing WS message:", e);
+        }
+      };
 
-            // Single animation loop drives both volume meters.
-            const tick = () => {
-                if (aiMeter) setAiLevel(aiMeter());
-                if (userMeter) setUserLevel(userMeter());
-                rafRef.current = requestAnimationFrame(tick);
-            };
-            rafRef.current = requestAnimationFrame(tick);
-        })();
+      socket.onerror = (err) => {
+        console.error("[Interview] WebSocket error:", err);
+        setStatus("error");
+        setErrorMessage("Failed to connect to the live interview server.");
+      };
 
-        return () => {
-            cancelled = true;
-            cleanup();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [interviewId]);
+      socket.onclose = () => {
+        console.log("[Interview] WebSocket closed");
+      };
 
-    function cleanup() {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        recorderRef.current?.state !== "inactive" && recorderRef.current?.stop();
-        socketRef.current?.close();
-        userStreamRef.current?.getTracks().forEach((t) => t.stop());
-        pcRef.current?.getSenders().forEach((s) => s.track?.stop());
-        pcRef.current?.close();
-        audioCtxRef.current?.close().catch(() => {});
+      // 4. Start visualizer animation loop
+      const tick = () => {
+        if (playerRef.current) {
+          setAiLevel(playerRef.current.getVolumeLevel());
+        }
+        if (recorderRef.current) {
+          setUserLevel(recorderRef.current.getVolumeLevel());
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch (err: any) {
+      console.error("[Interview] Join error:", err);
+      setStatus("error");
+      setErrorMessage(err.message || "Could not access microphone or connect audio.");
     }
+  };
 
-    function endInterview() {
-        setStatus("ending");
-        cleanup();
-        navigate(`/result/${interviewId}`);
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  function cleanup() {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
+    if (playerRef.current) {
+      playerRef.current.close();
+      playerRef.current = null;
+    }
+    if (socketRef.current) {
+      if (socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: "end" }));
+      }
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+  }
 
-    const aiSpeaking = aiLevel > 0.06 && aiLevel >= userLevel;
-    const userSpeaking = userLevel > 0.06 && userLevel > aiLevel;
+  function endInterview() {
+    setStatus("ending");
+    cleanup();
+    navigate(`/result/${interviewId}`);
+  }
 
-    return (
-        <main className="flex h-screen w-screen flex-col overflow-hidden">
-            {/* Header */}
-            <header className="flex items-center justify-between px-6 py-5">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                    <span className="relative flex size-2.5">
-                        <span
-                            className={
-                                status === "live"
-                                    ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
-                                    : "hidden"
-                            }
-                        />
-                        <span
-                            className={
-                                "relative inline-flex size-2.5 rounded-full " +
-                                (status === "live" ? "bg-emerald-400" : "bg-amber-400")
-                            }
-                        />
-                    </span>
-                    {status === "connecting" ? "Connecting…" : status === "ending" ? "Wrapping up…" : "Interview live"}
-                </div>
-                <span className="text-sm text-muted-foreground">AI Interview</span>
-            </header>
+  const aiSpeaking = aiLevel > 0.05 && aiLevel >= userLevel;
+  const userSpeaking = userLevel > 0.05 && userLevel > aiLevel;
 
-            {/* Stage */}
-            <div className="flex flex-1 items-center justify-center px-6">
-                {status === "connecting" ? (
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                        <Loader2 className="size-7 animate-spin" />
-                        <p className="text-sm">Setting up your interview & microphone…</p>
-                    </div>
-                ) : (
-                    <div className="flex w-full max-w-3xl items-center justify-center gap-12 sm:gap-24">
-                        <VoiceOrb
-                            level={aiLevel}
-                            speaking={aiSpeaking}
-                            label="Interviewer"
-                            sublabel="Listening"
-                            icon={Bot}
-                            accent="violet"
-                        />
-                        <VoiceOrb
-                            level={userLevel}
-                            speaking={userSpeaking}
-                            label="You"
-                            sublabel="Mic on"
-                            icon={User}
-                            accent="emerald"
-                        />
-                    </div>
-                )}
+  return (
+    <main className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground select-none">
+      {/* Header */}
+      <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="relative flex size-2.5">
+            <span
+              className={
+                status === "live"
+                  ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+                  : "hidden"
+              }
+            />
+            <span
+              className={
+                "relative inline-flex size-2.5 rounded-full " +
+                (status === "live"
+                  ? "bg-emerald-400"
+                  : status === "error"
+                  ? "bg-destructive"
+                  : status === "connecting"
+                  ? "bg-amber-400"
+                  : "bg-muted-foreground")
+              }
+            />
+          </span>
+          <span className="text-sm font-medium">
+            {status === "idle"
+              ? "Ready to join"
+              : status === "connecting"
+              ? "Connecting to Gemini Live…"
+              : status === "ending"
+              ? "Generating Evaluation…"
+              : status === "error"
+              ? "Connection Error"
+              : "Interview in progress"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-secondary/80 px-2.5 py-1 text-xs text-muted-foreground">
+            ⚡ {activeModel}
+          </span>
+        </div>
+      </header>
+
+      {/* Stage */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6">
+        {status === "idle" && (
+          <div className="flex max-w-md flex-col items-center gap-6 text-center">
+            <div className="grid size-20 place-items-center rounded-3xl bg-primary/10 text-primary ring-8 ring-primary/5">
+              <Bot className="size-10 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                Your Interview is Ready
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Alex has reviewed your GitHub repositories and is prepared to conduct your technical screen.
+              </p>
             </div>
 
-            {/* Controls */}
-            <footer className="flex justify-center px-6 py-8">
-                <Button
-                    variant="destructive"
-                    size="lg"
-                    onClick={endInterview}
-                    disabled={status === "ending"}
-                    className="gap-2 rounded-full px-6"
-                >
-                    {status === "ending" ? (
-                        <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                        <PhoneOff className="size-4" />
-                    )}
-                    End interview
-                </Button>
-            </footer>
-        </main>
-    );
+            <div className="flex w-full flex-col gap-3">
+              <Button
+                size="lg"
+                onClick={joinInterview}
+                className="w-full gap-2 rounded-xl py-6 text-base font-semibold shadow-lg shadow-primary/20"
+              >
+                <Play className="size-5 fill-current" />
+                Join Interview Now
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Clicking activates your audio speakers and connects your microphone.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {status === "connecting" && (
+          <div className="flex flex-col items-center gap-4 text-center text-muted-foreground">
+            <div className="grid size-16 place-items-center rounded-2xl bg-secondary/60 text-primary">
+              <Loader2 className="size-8 animate-spin" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-foreground">Entering Interview Room</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Connecting audio pipeline & initializing Gemini Live…
+              </p>
+            </div>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="flex max-w-md flex-col items-center gap-4 text-center">
+            <div className="grid size-16 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+              <AlertCircle className="size-8" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-foreground">Unable to start interview</p>
+              <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <Button variant="outline" onClick={() => navigate("/")}>
+                Back to Home
+              </Button>
+              <Button onClick={() => setStatus("idle")}>Try Again</Button>
+            </div>
+          </div>
+        )}
+
+        {status === "live" && (
+          <div className="flex flex-col items-center gap-12">
+            <div className="flex w-full max-w-3xl items-center justify-center gap-12 sm:gap-28">
+              <VoiceOrb
+                level={aiLevel}
+                speaking={aiSpeaking}
+                label="Alex (AI Interviewer)"
+                sublabel={aiSpeaking ? "Speaking" : "Listening"}
+                icon={Bot}
+                accent="violet"
+              />
+              <VoiceOrb
+                level={userLevel}
+                speaking={userSpeaking}
+                label="You"
+                sublabel={userSpeaking ? "Speaking" : "Microphone active"}
+                icon={User}
+                accent="emerald"
+              />
+            </div>
+
+            {liveCaption && (
+              <div className="max-w-xl rounded-xl border border-border/50 bg-card/40 px-5 py-3 text-center text-xs text-muted-foreground backdrop-blur shadow-sm">
+                <span className="italic font-mono">"{liveCaption}"</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      <footer className="flex items-center justify-between border-t border-border/40 px-6 py-5">
+        <div className="text-xs text-muted-foreground">
+          {status === "live"
+            ? "Tip: Speak naturally into your mic and interrupt anytime."
+            : "Use headphones for the best audio experience."}
+        </div>
+
+        {status === "live" && (
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={endInterview}
+            className="gap-2 rounded-full px-6 shadow-md"
+          >
+            <PhoneOff className="size-4" />
+            End interview
+          </Button>
+        )}
+      </footer>
+    </main>
+  );
 }

@@ -1,136 +1,73 @@
+import http from "node:http";
 import express from "express";
-import { PreInterviewBody } from "./types";
-import { scrapeGithub } from "./scrapers/github";
 import cors from "cors";
-import { prisma } from "./db";
-import { initSideband } from "./sideband";
-import { calculateResult } from "./result";
+import { WebSocketServer, WebSocket } from "ws";
+import { config, validateConfig } from "./config";
+import { interviewRouter } from "./routes/interview";
+import { handleGeminiLiveSession } from "./services/geminiLive";
+
+validateConfig();
 
 const app = express();
+
+// Middleware
 app.use(express.json());
-app.use(cors());
-app.use(express.text({ type: ["application/sdp", "text/plain"] }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or dev tools)
+      if (!origin) return callback(null, true);
+      // In development, allow localhost origins
+      if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
+        return callback(null, true);
+      }
+      if (origin === config.CORS_ORIGIN) {
+        return callback(null, true);
+      }
+      callback(null, true);
+    },
+    credentials: true,
+  })
+);
 
-app.post("/api/v1/pre-interview", async (req, res) => { 
-    const { success, data } = PreInterviewBody.safeParse(req.body) ;
-
-    if (!success) {
-        res.status(411).json({
-            message: "Incorrect body"
-        });
-        return 
-    }
-
-    // TODO: URL can be very malformed, probably use an SLM here?
-    const githubUrl = data.github.endsWith("/") ? data.github.slice(0, -1) : data.github;
-
-    const githubUsername = githubUrl.split("/").pop()!;
-
-    const githubData = await scrapeGithub(githubUsername);
-
-    const interview = await prisma.interview.create({
-        data: {
-            githubMetadata: JSON.stringify(githubData),
-            status: "Pre"
-        }
-    })
-
-    res.json({ id: interview.id });
-})
-
-app.post("/api/v1/session/:interviewId", async (req, res) => {
-    
-    const sessionConfig = JSON.stringify({
-        type: "realtime",
-        model: "gpt-realtime",
-        audio: { output: { voice: "marin" } },
-    });
-
-    const fd = new FormData();
-    fd.set("sdp", req.body);
-    fd.set("session", sessionConfig);
-  
-    try {
-      const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_KEY}`,
-          "OpenAI-Safety-Identifier": "hashed-user-id",
-        },
-        body: fd,
-      });
-
-      const location = sdpResponse.headers.get("Location");
-      const callId = location?.split("/").pop()!;
-      console.log(callId);
-      // Send back the SDP we received from the OpenAI REST API
-      const sdp = await sdpResponse.text();
-      res.send(sdp);
-
-      initSideband(callId, req.params.interviewId);
-    } catch (error) {
-      console.error("Token generation error:", error);
-      res.status(500).json({ error: "Failed to generate token" });
-    }
-
+// Health check
+app.get("/health", (_, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.post("/api/v1/session/user/response/:interviewId", async (req, res) => {
-  const { message } = req.body;
-  await prisma.message.create({
-    data: {
-        interviewId: req.params.interviewId!,
-        type: "User",
-        message: message
-    }
-  });
+// API Routes
+app.use("/api/v1", interviewRouter);
 
-  res.json({message: "Message saved"});
-})
+// HTTP Server
+const server = http.createServer(app);
 
-app.get("/api/v1/result/:interviewId", async (req, res) => {
-  const interview = await prisma.interview.findFirst({
-    where: {
-      id: req.params.interviewId
-    },
-    include: {
-      conversations: true
-    }
-  })
+// WebSocket Server for Gemini Multimodal Live streaming
+const wss = new WebSocketServer({ noServer: true });
 
-  if (!interview) {
-    res.status(411).json({
-      message: "Interview not found"
-    })
-    return 
+server.on("upgrade", (request, socket, head) => {
+  const url = new URL(request.url || "", `http://${request.headers.host}`);
+  const pathname = url.pathname;
+
+  // Match /api/v1/live/:interviewId or /api/v1/live?interviewId=...
+  const match = pathname.match(/^\/api\/v1\/live\/([^/]+)$/);
+  const interviewId = match ? match[1] : url.searchParams.get("interviewId");
+
+  if (interviewId) {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request, interviewId);
+    });
+  } else {
+    socket.destroy();
   }
+});
 
-  res.json({
-    score: interview?.score,
-    feedback: interview?.feedback,
-    transcript: interview?.conversations.map(c => ({
-      type: c.type,
-      content: c.message,
-      createdAt: c.createdAt
-    })),
-    status: interview.status
-  })
+wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, interviewId: string) => {
+  console.log(`[WebSocket] Client connected for live interview: ${interviewId}`);
+  handleGeminiLiveSession(ws, interviewId);
+});
 
-  // TODO: Should add some sort of a lock here.
-  if (interview.status != "Done") {
-    const result = await calculateResult(interview.conversations)
-
-    await prisma.interview.update({
-      where: {
-        id: req.params.interviewId
-      },
-      data: {
-        status: "Done",
-        feedback: result.feedback,
-        score: result.score
-      }
-    })
-  }
-})
-
-app.listen(3001);
+server.listen(config.PORT, () => {
+  console.log(`🚀 AI Interviewer Backend running on http://localhost:${config.PORT}`);
+  console.log(`🎙️  Gemini Live Model: ${config.GEMINI_LIVE_MODEL}`);
+  console.log(`📊 Gemini Eval Model: ${config.GEMINI_EVAL_MODEL}`);
+});

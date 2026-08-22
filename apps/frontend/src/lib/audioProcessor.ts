@@ -226,15 +226,19 @@ export class LiveMicrophoneRecorder {
     this.onPcmData = onPcmData;
   }
 
-  public async start(): Promise<void> {
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+  public async start(existingStream?: MediaStream): Promise<void> {
+    if (existingStream && existingStream.active && existingStream.getAudioTracks().length > 0) {
+      this.mediaStream = existingStream;
+    } else {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    }
 
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     this.audioCtx = new AudioCtx();

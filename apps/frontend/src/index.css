@@ -35,3 +35,56 @@ body::before {
     animation: none !important;
   }
 }
+
+/* Print / PDF Export Stylesheet */
+@media print {
+  @page {
+    margin: 1.2cm;
+    size: auto;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  [data-no-print],
+  header button,
+  footer,
+  nav {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Keep cards and sections intact across pages */
+  section,
+  .rounded-2xl,
+  .rounded-xl {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+    border-color: #e5e7eb !important;
+    background-color: #f9fafb !important;
+  }
+
+  /* Make score and text high contrast for printing */
+  .text-muted-foreground {
+    color: #4b5563 !important;
+  }
+
+  .text-foreground {
+    color: #111827 !important;
+  }
+
+  .backdrop-blur {
+    backdrop-filter: none !important;
+  }
+}

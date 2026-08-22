@@ -51,7 +51,13 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
             hasValidRepos = true;
             const reposList = meta.repos
               .slice(0, 8)
-              .map((r: any) => `- ${r.name} (${r.language || "General"}): ${r.description || "No description"} [Topics: ${(r.topics || []).join(", ") || "none"}]`)
+              .map((r: any) => {
+                let text = `- ${r.name} (${r.language || "General"}): ${r.description || "No description"} [Topics: ${(r.topics || []).join(", ") || "none"}]`;
+                if (r.readme) {
+                  text += `\n  README Summary: ${r.readme.slice(0, 400).replace(/\n+/g, " ")}...`;
+                }
+                return text;
+              })
               .join("\n");
 
             candidateProfileSummary = `Candidate Username: ${meta.username || "Candidate"}

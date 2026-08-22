@@ -25,6 +25,7 @@ export const EvaluationResultSchema = z.object({
   strengths: z.array(z.string()).describe("Top 3-5 key strengths demonstrated"),
   improvements: z.array(z.string()).describe("Top 3-5 areas where the candidate should improve"),
   evidence: z.array(EvidenceItemSchema).describe("Specific quotes with analysis proving the score"),
+  evalModel: z.string().optional().describe("Model name used to perform evaluation"),
 });
 
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
@@ -180,7 +181,10 @@ Respond with ONLY a valid JSON object strictly matching this schema:
       }
 
       const parsedJson = JSON.parse(rawText);
-      const evaluationData = EvaluationResultSchema.parse(parsedJson);
+      const evaluationData = EvaluationResultSchema.parse({
+        ...parsedJson,
+        evalModel: modelName,
+      });
 
       console.log(`[Evaluation] Evaluation succeeded using ${modelName} (Score: ${evaluationData.overallScore}/10)`);
       return {
@@ -214,6 +218,7 @@ Respond with ONLY a valid JSON object strictly matching this schema:
       "Review interview transcript for fine-grained technical nuances.",
     ],
     evidence: [],
+    evalModel: "fallback",
   };
 
   return {

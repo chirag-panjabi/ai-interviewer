@@ -8,6 +8,7 @@ export interface GithubRepo {
   stars: number;
   topics: string[];
   url: string;
+  readme?: string | null;
 }
 
 export interface GithubPortfolio {
@@ -68,16 +69,48 @@ export async function scrapeGithub(input: string): Promise<GithubPortfolio> {
 
     const reposData = Array.isArray(reposRes.data) ? reposRes.data : [];
 
-    const repos: GithubRepo[] = reposData
-      .filter((repo: any) => !repo.fork) // prioritize original projects
-      .map((repo: any) => ({
-        name: repo.name,
-        description: repo.description || null,
-        language: repo.language || null,
-        stars: repo.stargazers_count || 0,
-        topics: Array.isArray(repo.topics) ? repo.topics : [],
-        url: repo.html_url,
-      }));
+    const nonForkRepos = reposData.filter((repo: any) => !repo.fork);
+    // Sort non-fork repos by stars descending to prioritize the candidate's best work
+    nonForkRepos.sort((a: any, b: any) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+
+    // Budget: 3 repos if authenticated with GITHUB_TOKEN, 1 repo if unauthenticated (to conserve 60 req/hr rate limit)
+    const readmeLimit = config.GITHUB_TOKEN ? 3 : 1;
+    const topReposToFetchReadme = nonForkRepos.slice(0, readmeLimit);
+
+    const readmeMap = new Map<string, string>();
+    await Promise.all(
+      topReposToFetchReadme.map(async (repo: any) => {
+        try {
+          const readmeRes = await axios.get(
+            `https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo.name)}/readme`,
+            {
+              headers: {
+                ...headers,
+                Accept: "application/vnd.github.v3.raw",
+              },
+              timeout: 5000,
+              responseType: "text",
+            }
+          );
+          if (typeof readmeRes.data === "string" && readmeRes.data.trim()) {
+            // Truncate to 1500 chars to respect prompt token budget
+            readmeMap.set(repo.name, readmeRes.data.trim().slice(0, 1500));
+          }
+        } catch {
+          // Repo might not have a README or rate limit encountered; gracefully continue
+        }
+      })
+    );
+
+    const repos: GithubRepo[] = nonForkRepos.map((repo: any) => ({
+      name: repo.name,
+      description: repo.description || null,
+      language: repo.language || null,
+      stars: repo.stargazers_count || 0,
+      topics: Array.isArray(repo.topics) ? repo.topics : [],
+      url: repo.html_url,
+      readme: readmeMap.get(repo.name) || null,
+    }));
 
     return {
       username: userData.login || username,

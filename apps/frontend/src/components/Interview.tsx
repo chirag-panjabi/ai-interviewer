@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Bot, Loader2, PhoneOff, User, Mic, Volume2, AlertCircle, Play } from "lucide-react";
+import { Bot, Loader2, PhoneOff, User, Mic, MicOff, AlertCircle, Play, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
 import { getBackendWsUrl } from "@/lib/config";
 import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
+import { cn } from "@/lib/utils";
 
 type Status = "idle" | "connecting" | "live" | "ending" | "error";
 
@@ -19,10 +20,101 @@ export function Interview() {
   const [activeModel, setActiveModel] = useState<string>("gemini-3.1-flash-live-preview");
   const [liveCaption, setLiveCaption] = useState<string>("");
 
+  // Controls & Timer State
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const callStartTimeRef = useRef<number>(0);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Pre-join Mic Test State
+  const [isTestingMic, setIsTestingMic] = useState(false);
+  const [testVolume, setTestVolume] = useState(0);
+  const [micDetected, setMicDetected] = useState(false);
+  const testStreamRef = useRef<MediaStream | null>(null);
+  const testAudioCtxRef = useRef<AudioContext | null>(null);
+  const testRafRef = useRef<number | null>(null);
+
   const socketRef = useRef<WebSocket | null>(null);
   const playerRef = useRef<LiveAudioPlayer | null>(null);
   const recorderRef = useRef<LiveMicrophoneRecorder | null>(null);
   const rafRef = useRef<number | null>(null);
+
+  // Toggle Microphone Mute
+  const toggleMute = () => {
+    const nextMuted = !isMuted;
+    isMutedRef.current = nextMuted;
+    setIsMuted(nextMuted);
+  };
+
+  // Start Mic Level Test
+  const startMicTest = async () => {
+    try {
+      setIsTestingMic(true);
+      setMicDetected(false);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      testStreamRef.current = stream;
+
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      testAudioCtxRef.current = ctx;
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const dataArray = new Uint8Array(analyser.fftSize);
+
+      const checkVolume = () => {
+        analyser.getByteTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i]! - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const level = Math.min(1, rms * 4.5);
+        setTestVolume(level);
+        if (level > 0.05) {
+          setMicDetected(true);
+        }
+        testRafRef.current = requestAnimationFrame(checkVolume);
+      };
+      testRafRef.current = requestAnimationFrame(checkVolume);
+    } catch (err: any) {
+      console.warn("Could not start mic test:", err);
+      setIsTestingMic(false);
+    }
+  };
+
+  // Stop Mic Level Test
+  const stopMicTest = (keepStreamAlive = false) => {
+    if (testRafRef.current) {
+      cancelAnimationFrame(testRafRef.current);
+      testRafRef.current = null;
+    }
+    if (testAudioCtxRef.current && testAudioCtxRef.current.state !== "closed") {
+      testAudioCtxRef.current.close().catch(() => {});
+      testAudioCtxRef.current = null;
+    }
+    if (!keepStreamAlive && testStreamRef.current) {
+      testStreamRef.current.getTracks().forEach((track) => track.stop());
+      testStreamRef.current = null;
+    }
+    setIsTestingMic(false);
+    setTestVolume(0);
+  };
 
   // Initialize and start interview explicitly from user click
   const joinInterview = async () => {
@@ -31,6 +123,10 @@ export function Interview() {
       setErrorMessage("Missing interview ID");
       return;
     }
+
+    // Stop mic test analysis loop but keep media stream if active for reuse
+    const reusableStream = testStreamRef.current;
+    stopMicTest(true);
 
     setStatus("connecting");
     setErrorMessage(null);
@@ -59,17 +155,26 @@ export function Interview() {
 
             await player.resume();
 
-            // 3. Request and activate microphone
+            // 3. Request and activate microphone (reusing test stream if available)
             const recorder = new LiveMicrophoneRecorder((pcm) => {
-              if (socket.readyState === WebSocket.OPEN) {
+              if (socket.readyState === WebSocket.OPEN && !isMutedRef.current) {
                 socket.send(JSON.stringify({ type: "audio", pcm }));
               }
             });
 
-            await recorder.start();
+            await recorder.start(reusableStream && reusableStream.active ? reusableStream : undefined);
             recorderRef.current = recorder;
 
             setStatus("live");
+            callStartTimeRef.current = Date.now();
+            setElapsedSeconds(0);
+
+            // Start Live Call Timer
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = setInterval(() => {
+              const sec = Math.floor((Date.now() - callStartTimeRef.current) / 1000);
+              setElapsedSeconds(sec);
+            }, 1000);
           } else if (data.type === "audio" && data.pcm) {
             player.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
@@ -131,6 +236,11 @@ export function Interview() {
   }, []);
 
   function cleanup() {
+    stopMicTest(false);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -157,6 +267,12 @@ export function Interview() {
     cleanup();
     navigate(`/result/${interviewId}`);
   }
+
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   const aiSpeaking = aiLevel > 0.05 && aiLevel >= userLevel;
   const userSpeaking = userLevel > 0.05 && userLevel > aiLevel;
@@ -196,7 +312,7 @@ export function Interview() {
               ? "Generating Evaluation…"
               : status === "error"
               ? "Connection Error"
-              : "Interview in progress"}
+              : `Interview in progress · ${formatTimer(elapsedSeconds)}`}
           </span>
         </div>
 
@@ -232,6 +348,48 @@ export function Interview() {
                 <Play className="size-5 fill-current" />
                 Join Interview Now
               </Button>
+
+              {/* Pre-join Mic Check Box */}
+              <div className="mt-2 rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Mic className="size-3.5 text-primary" />
+                    Microphone Check
+                  </span>
+                  {!isTestingMic ? (
+                    <button
+                      onClick={startMicTest}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Test Microphone
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => stopMicTest(false)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Done
+                    </button>
+                  )}
+                </div>
+
+                {isTestingMic && (
+                  <div className="mt-3 space-y-2">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
+                      <div
+                        className="h-full bg-emerald-400 transition-all duration-75"
+                        style={{ width: `${Math.round(testVolume * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {micDetected
+                        ? "✅ Microphone is capturing your voice clearly."
+                        : "Speak into your microphone to verify level..."}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 Clicking activates your audio speakers and connects your microphone.
               </p>
@@ -283,12 +441,12 @@ export function Interview() {
                 accent="violet"
               />
               <VoiceOrb
-                level={userLevel}
-                speaking={userSpeaking}
+                level={isMuted ? 0 : userLevel}
+                speaking={!isMuted && userSpeaking}
                 label="You"
-                sublabel={userSpeaking ? "Speaking" : "Microphone active"}
+                sublabel={isMuted ? "Muted" : userSpeaking ? "Speaking" : "Microphone active"}
                 icon={User}
-                accent="emerald"
+                accent={isMuted ? "violet" : "emerald"}
               />
             </div>
 
@@ -305,20 +463,35 @@ export function Interview() {
       <footer className="flex items-center justify-between border-t border-border/40 px-6 py-5">
         <div className="text-xs text-muted-foreground">
           {status === "live"
-            ? "Tip: Speak naturally into your mic and interrupt anytime."
+            ? "Tip: Speak naturally and interrupt anytime. Use Mute to pause transmission."
             : "Use headphones for the best audio experience."}
         </div>
 
         {status === "live" && (
-          <Button
-            variant="destructive"
-            size="lg"
-            onClick={endInterview}
-            className="gap-2 rounded-full px-6 shadow-md"
-          >
-            <PhoneOff className="size-4" />
-            End interview
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={isMuted ? "destructive" : "secondary"}
+              size="lg"
+              onClick={toggleMute}
+              className={cn(
+                "gap-2 rounded-full px-5 shadow-sm transition-all",
+                isMuted && "ring-2 ring-destructive/40"
+              )}
+            >
+              {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+              <span>{isMuted ? "Unmute" : "Mute"}</span>
+            </Button>
+
+            <Button
+              variant="destructive"
+              size="lg"
+              onClick={endInterview}
+              className="gap-2 rounded-full px-6 shadow-md"
+            >
+              <PhoneOff className="size-4" />
+              End interview
+            </Button>
+          </div>
         )}
       </footer>
     </main>

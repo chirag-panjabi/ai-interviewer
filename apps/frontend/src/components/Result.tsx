@@ -5,7 +5,6 @@ import { useNavigate, useParams } from "react-router";
 import {
   Bot,
   Loader2,
-  Sparkles,
   User,
   CheckCircle2,
   AlertTriangle,
@@ -16,8 +15,14 @@ import {
   Layers,
   Quote,
   ArrowLeft,
+  Share2,
+  Download,
+  Search,
+  Check,
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface CategoryScore {
@@ -43,6 +48,7 @@ interface EvaluationData {
   strengths: string[];
   improvements: string[];
   evidence: EvidenceItem[];
+  evalModel?: string;
 }
 
 interface ResultData {
@@ -64,6 +70,11 @@ export function Result() {
     status: "EVALUATING",
   });
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  // Transcript Search & Filtering
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "Assistant" | "User">("all");
 
   useEffect(() => {
     let intervalId: any = null;
@@ -94,6 +105,17 @@ export function Result() {
   const ready = result.status === "COMPLETED" || result.status === "Done";
   const evalData = result.evaluationData;
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.success("Scorecard link copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrintPdf = () => {
+    window.print();
+  };
+
   const getRecommendationBadge = (rec?: string) => {
     switch (rec) {
       case "Strong Hire":
@@ -121,23 +143,69 @@ export function Result() {
 
   const recBadge = getRecommendationBadge(evalData?.recommendation);
 
+  // Filtered transcript messages
+  const filteredTranscript = result.transcript.filter((m) => {
+    const matchesRole = roleFilter === "all" || m.type === roleFilter;
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      m.content.toLowerCase().includes(searchQuery.toLowerCase().trim());
+    return matchesRole && matchesSearch;
+  });
+
+  const modelDisplayName = evalData?.evalModel || "Gemini AI";
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-12">
       <header className="mb-10 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-full">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/")}
+            className="rounded-full"
+            data-no-print
+          >
             <ArrowLeft className="size-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Interview Evaluation</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Powered by Gemini 3.6 Flash technical evaluation rubric.
+              Powered by <span className="font-semibold text-foreground/80">{modelDisplayName}</span> standardized evaluation rubric.
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => navigate("/")}>
-          New interview
-        </Button>
+
+        <div className="flex items-center gap-2" data-no-print>
+          {ready && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyLink}
+                className="gap-1.5 rounded-lg text-xs"
+                title="Copy shareable link"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-400" /> : <Share2 className="size-3.5" />}
+                <span>{copied ? "Copied" : "Share"}</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintPdf}
+                className="gap-1.5 rounded-lg text-xs"
+                title="Save as PDF / Print scorecard"
+              >
+                <Download className="size-3.5" />
+                <span>Export PDF</span>
+              </Button>
+            </>
+          )}
+
+          <Button variant="default" size="sm" onClick={() => navigate("/")} className="rounded-lg text-xs">
+            New interview
+          </Button>
+        </div>
       </header>
 
       {!ready ? (
@@ -148,7 +216,7 @@ export function Result() {
           <div>
             <p className="text-base font-semibold">Analyzing interview transcript…</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Gemini 3.6 Flash is evaluating technical accuracy, problem solving, and depth.
+              Evaluating technical accuracy, problem solving, communication, and engineering depth.
             </p>
           </div>
         </div>
@@ -170,7 +238,7 @@ export function Result() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">Automated candidate scorecard</p>
+                  <p className="text-xs text-muted-foreground">Automated candidate technical scorecard</p>
                 </div>
               </div>
 
@@ -330,18 +398,79 @@ export function Result() {
             </section>
           )}
 
-          {/* Full Chronological Transcript */}
+          {/* Full Chronological Transcript with Search & Role Filter */}
           <section>
-            <h2 className="mb-4 text-sm font-semibold text-muted-foreground">
-              Full Conversation Transcript ({result.transcript.length} messages)
-            </h2>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-muted-foreground">
+                  Conversation Transcript
+                </h2>
+                <p className="text-xs text-muted-foreground/80">
+                  Showing {filteredTranscript.length} of {result.transcript.length} messages
+                </p>
+              </div>
+
+              {/* Transcript Controls (Hidden in Print) */}
+              <div className="flex flex-wrap items-center gap-2" data-no-print>
+                {/* Search Bar */}
+                <div className="relative flex items-center">
+                  <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search keywords..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 w-44 rounded-lg pl-8 text-xs bg-card/50"
+                  />
+                </div>
+
+                {/* Role Filter Tabs */}
+                <div className="flex rounded-lg border border-border/60 bg-card/50 p-0.5 text-xs">
+                  <button
+                    onClick={() => setRoleFilter("all")}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      roleFilter === "all"
+                        ? "bg-secondary text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setRoleFilter("Assistant")}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      roleFilter === "Assistant"
+                        ? "bg-secondary text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Alex
+                  </button>
+                  <button
+                    onClick={() => setRoleFilter("User")}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                      roleFilter === "User"
+                        ? "bg-secondary text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    You
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-4">
-              {result.transcript.length === 0 && (
+              {filteredTranscript.length === 0 && (
                 <div className="rounded-xl border border-border bg-card/30 p-8 text-center text-sm text-muted-foreground">
-                  No conversation messages recorded.
+                  {result.transcript.length === 0
+                    ? "No conversation messages recorded."
+                    : "No messages match your search filter."}
                 </div>
               )}
-              {result.transcript.map((m, i) => {
+              {filteredTranscript.map((m, i) => {
                 const isAi = m.type === "Assistant";
                 return (
                   <div

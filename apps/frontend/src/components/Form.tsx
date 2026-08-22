@@ -26,6 +26,8 @@ import {
   Code,
   FolderGit2,
   Plus,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -249,7 +251,7 @@ export function Form() {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       triggerPreviewFetch(val);
-    }, 700);
+    }, 350);
   }
 
   function validateInput(value: string): boolean {
@@ -472,8 +474,20 @@ export function Form() {
               disabled={loading}
               className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-sm"
             />
-            {fetchingPreview && (
-              <Loader2 className="size-4 animate-spin text-muted-foreground mr-1" />
+            {github.trim() && (
+              <button
+                type="button"
+                onClick={() => triggerPreviewFetch(github)}
+                disabled={fetchingPreview || loading}
+                title="Scan repositories"
+                className="p-1.5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors mr-1"
+              >
+                {fetchingPreview ? (
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+              </button>
             )}
             <Button
               disabled={loading}
@@ -502,166 +516,211 @@ export function Form() {
           )}
 
           {/* Interactive Project / Repository Selector */}
-          {profilePreview && profilePreview.repos.length > 0 && (
-            <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <FolderGit2 className="size-3.5 text-primary" />
-                  Select flagship project for Alex to discuss (or skip):
-                </span>
-                {profilePreview.name && (
-                  <span className="text-[11px] text-foreground/80 font-normal">
-                    @{profilePreview.username} ({profilePreview.publicReposCount} public repos)
+          {(() => {
+            const parsed = parseInput(github);
+            if (!parsed.isValid || !parsed.username) return null;
+
+            // Loading Skeleton
+            if (fetchingPreview && !profilePreview) {
+              return (
+                <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="size-3.5 animate-spin text-primary" />
+                      Scanning GitHub repositories for @{parsed.username}...
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="h-16 rounded-xl border border-border/40 bg-card/20 animate-pulse" />
+                    <div className="h-16 rounded-xl border border-border/40 bg-card/20 animate-pulse" />
+                  </div>
+                </div>
+              );
+            }
+
+            const hasRepos = profilePreview && profilePreview.repos && profilePreview.repos.length > 0;
+
+            return (
+              <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <FolderGit2 className="size-3.5 text-primary" />
+                    {hasRepos
+                      ? "Select flagship project for Alex to discuss (or skip):"
+                      : `Choose interview focus for @${parsed.username}:`}
                   </span>
+                  <div className="flex items-center gap-2">
+                    {profilePreview?.name && hasRepos && (
+                      <span className="text-[11px] text-foreground/80 font-normal">
+                        @{profilePreview.username} ({profilePreview.publicReposCount} repos)
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => triggerPreviewFetch(github)}
+                      disabled={fetchingPreview || loading}
+                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      <RefreshCw className={cn("size-2.5", fetchingPreview && "animate-spin")} />
+                      Scan
+                    </button>
+                  </div>
+                </div>
+
+                {!hasRepos && !fetchingPreview && (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-[11px] text-muted-foreground">
+                    💡 No public repos auto-listed. You can select <strong>General Domain</strong> or specify any public repo below:
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {/* General Domain Screen Option */}
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setIsGeneralDomainOnly(true);
+                      setIsCustomMode(false);
+                      setSelectedRepo(null);
+                    }}
+                    className={cn(
+                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                      isGeneralDomainOnly
+                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                        : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                      loading && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
+                      <Globe className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">
+                          General Domain Screen
+                        </span>
+                        {isGeneralDomainOnly && (
+                          <Check className="size-3 text-primary stroke-[3]" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground line-clamp-1">
+                        Skip project questions; launch directly into domain scenarios
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Candidate Public Repositories (Top 5) */}
+                  {hasRepos &&
+                    profilePreview.repos.slice(0, 5).map((r) => {
+                      const isSelected = !isGeneralDomainOnly && !isCustomMode && selectedRepo === r.name;
+                      return (
+                        <button
+                          key={r.name}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setSelectedRepo(r.name);
+                            setIsGeneralDomainOnly(false);
+                            setIsCustomMode(false);
+                          }}
+                          className={cn(
+                            "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                              : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                            loading && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-foreground/70">
+                            <Code className="size-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-semibold text-foreground truncate">
+                                {r.name}
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {r.stars > 0 && (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-amber-400 font-medium">
+                                    <Star className="size-2.5 fill-amber-400" />
+                                    {r.stars}
+                                  </span>
+                                )}
+                                {isSelected && (
+                                  <Check className="size-3 text-primary stroke-[3]" />
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                              {r.language && (
+                                <span className="font-medium text-foreground/70">
+                                  {r.language}
+                                </span>
+                              )}
+                              <span className="truncate">
+                                {r.description || "No description provided"}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                  {/* Custom Repo Option */}
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setIsCustomMode(true);
+                      setIsGeneralDomainOnly(false);
+                      setSelectedRepo(null);
+                    }}
+                    className={cn(
+                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                      isCustomMode
+                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                        : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                      loading && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
+                      <Plus className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">
+                          {hasRepos ? "Other Public Repo..." : "Specific Repo Name..."}
+                        </span>
+                        {isCustomMode && (
+                          <Check className="size-3 text-primary stroke-[3]" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground line-clamp-1">
+                        Enter any specific repository name
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Inline input if Custom Repo is chosen */}
+                {isCustomMode && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/50 bg-card/80 p-1.5 animate-in fade-in duration-150">
+                    <span className="pl-2 text-xs font-medium text-muted-foreground">
+                      Repo Name:
+                    </span>
+                    <Input
+                      value={customRepoInput}
+                      placeholder="e.g. ai-interviewer or my-app"
+                      onChange={(e) => setCustomRepoInput(e.target.value)}
+                      disabled={loading}
+                      className="h-8 border-0 bg-transparent text-xs focus-visible:ring-0"
+                      autoFocus
+                    />
+                  </div>
                 )}
               </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {/* General Domain Screen Option */}
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => {
-                    setIsGeneralDomainOnly(true);
-                    setIsCustomMode(false);
-                    setSelectedRepo(null);
-                  }}
-                  className={cn(
-                    "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
-                    isGeneralDomainOnly
-                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                      : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
-                    loading && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
-                    <Globe className="size-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground">
-                        General Domain Screen
-                      </span>
-                      {isGeneralDomainOnly && (
-                        <Check className="size-3 text-primary stroke-[3]" />
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground line-clamp-1">
-                      Skip project questions; launch directly into domain scenarios
-                    </p>
-                  </div>
-                </button>
-
-                {/* Candidate Public Repositories (Top 6) */}
-                {profilePreview.repos.slice(0, 5).map((r) => {
-                  const isSelected = !isGeneralDomainOnly && !isCustomMode && selectedRepo === r.name;
-                  return (
-                    <button
-                      key={r.name}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => {
-                        setSelectedRepo(r.name);
-                        setIsGeneralDomainOnly(false);
-                        setIsCustomMode(false);
-                      }}
-                      className={cn(
-                        "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                          : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
-                        loading && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-foreground/70">
-                        <Code className="size-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-semibold text-foreground truncate">
-                            {r.name}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {r.stars > 0 && (
-                              <span className="flex items-center gap-0.5 text-[10px] text-amber-400 font-medium">
-                                <Star className="size-2.5 fill-amber-400" />
-                                {r.stars}
-                              </span>
-                            )}
-                            {isSelected && (
-                              <Check className="size-3 text-primary stroke-[3]" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                          {r.language && (
-                            <span className="font-medium text-foreground/70">
-                              {r.language}
-                            </span>
-                          )}
-                          <span className="truncate">
-                            {r.description || "No description provided"}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {/* Custom Repo Option */}
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => {
-                    setIsCustomMode(true);
-                    setIsGeneralDomainOnly(false);
-                    setSelectedRepo(null);
-                  }}
-                  className={cn(
-                    "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
-                    isCustomMode
-                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                      : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
-                    loading && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
-                    <Plus className="size-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground">
-                        Other Public Repo...
-                      </span>
-                      {isCustomMode && (
-                        <Check className="size-3 text-primary stroke-[3]" />
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground line-clamp-1">
-                      Enter any repository not listed above
-                    </p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Inline input if Custom Repo is chosen */}
-              {isCustomMode && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/50 bg-card/80 p-1.5 animate-in fade-in duration-150">
-                  <span className="pl-2 text-xs font-medium text-muted-foreground">
-                    Repo Name:
-                  </span>
-                  <Input
-                    value={customRepoInput}
-                    placeholder="e.g. distributed-kv-store"
-                    onChange={(e) => setCustomRepoInput(e.target.value)}
-                    disabled={loading}
-                    className="h-8 border-0 bg-transparent text-xs focus-visible:ring-0"
-                    autoFocus
-                  />
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* Animated Ingestion Stepper */}
           {loading && (

@@ -96,6 +96,66 @@ export function parseGithubUsername(input: string): string {
   return parseGithubInput(input).username;
 }
 
+async function fetchReposFromHtmlFallback(username: string): Promise<GithubRepoPreview[]> {
+  try {
+    const res = await axios.get(`https://github.com/${encodeURIComponent(username)}?tab=repositories`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      httpsAgent,
+      timeout: 6000,
+    });
+
+    const html = res.data;
+    if (typeof html !== "string") return [];
+
+    const repos: GithubRepoPreview[] = [];
+    const seen = new Set<string>();
+
+    const repoMatchRegex = new RegExp(`href="/${username}/([^"/?#\\s]+)"(?:[^>]*itemprop="name codeRepository"|[^>]*data-hovercard-type="repository")`, "gi");
+    let match;
+    while ((match = repoMatchRegex.exec(html)) !== null) {
+      const repoName = match[1]?.trim();
+      if (repoName && !seen.has(repoName.toLowerCase()) && !["followers", "following", "stars", "tab", "repositories"].includes(repoName.toLowerCase())) {
+        seen.add(repoName.toLowerCase());
+        repos.push({
+          name: repoName,
+          description: null,
+          language: null,
+          stars: 0,
+          url: `https://github.com/${username}/${repoName}`,
+        });
+      }
+      if (repos.length >= 8) break;
+    }
+
+    if (repos.length === 0) {
+      const fallbackRegex = new RegExp(`itemprop="name codeRepository">\\s*([^<\\s]+)\\s*<`, "gi");
+      let fbMatch;
+      while ((fbMatch = fallbackRegex.exec(html)) !== null) {
+        const repoName = fbMatch[1]?.trim();
+        if (repoName && !seen.has(repoName.toLowerCase())) {
+          seen.add(repoName.toLowerCase());
+          repos.push({
+            name: repoName,
+            description: null,
+            language: null,
+            stars: 0,
+            url: `https://github.com/${username}/${repoName}`,
+          });
+        }
+        if (repos.length >= 8) break;
+      }
+    }
+
+    return repos;
+  } catch (err: any) {
+    console.warn(`[GitHubPreview] HTML fallback scraping failed for ${username}:`, err?.message);
+    return [];
+  }
+}
+
 export async function getGithubReposPreview(input: string): Promise<GithubProfilePreview> {
   const { username, repoName } = parseGithubInput(input);
   const cacheKey = username.toLowerCase();
@@ -159,7 +219,7 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       username: userData.login || username,
       name: userData.name || null,
       bio: userData.bio || null,
-      avatarUrl: userData.avatar_url || null,
+      avatarUrl: userData.avatar_url || `https://github.com/${username}.png`,
       publicReposCount: userData.public_repos || previewRepos.length,
       repos: previewRepos,
     };
@@ -167,16 +227,35 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
     previewCache.set(cacheKey, { timestamp: now, data: result });
     return result;
   } catch (err: any) {
-    console.warn(`[GitHubPreview] Could not fetch preview for ${username}: ${err?.response?.data?.message || err.message}`);
-    // Return graceful fallback without breaking frontend
-    return {
+    console.warn(`[GitHubPreview] API rate-limit/error for ${username}: ${err?.response?.data?.message || err.message}. Trying HTML scraper fallback...`);
+    
+    const fallbackRepos = await fetchReposFromHtmlFallback(username);
+    
+    // If specific repo was passed in URL, make sure it's included
+    if (repoName && !fallbackRepos.some(r => r.name.toLowerCase() === repoName.toLowerCase())) {
+      fallbackRepos.unshift({
+        name: repoName,
+        description: null,
+        language: null,
+        stars: 0,
+        url: `https://github.com/${username}/${repoName}`,
+      });
+    }
+
+    const result: GithubProfilePreview = {
       username,
       name: username,
       bio: null,
-      avatarUrl: null,
-      publicReposCount: 0,
-      repos: [],
+      avatarUrl: `https://github.com/${username}.png`,
+      publicReposCount: fallbackRepos.length,
+      repos: fallbackRepos,
     };
+
+    if (fallbackRepos.length > 0) {
+      previewCache.set(cacheKey, { timestamp: now, data: result });
+    }
+
+    return result;
   }
 }
 

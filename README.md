@@ -82,6 +82,10 @@ flowchart TD
 - **Native Barge-In Interruption Handling**: Instantly cuts off AI playback on the client when the candidate begins speaking.
 - **Web Audio API**: Client-side 16kHz PCM capture and gapless 24kHz buffer scheduling.
 
+### 6. 🛡️ 2-Tier Access & Configurable Demo Quotas
+- **Hosted Cloud Demo**: 1-click evaluation out of the box with configurable IP rate limits (`DEMO_DAILY_INTERVIEW_LIMIT=15`).
+- **Bring-Your-Own-Key (BYOK)**: Candidates can supply their personal free Google AI Studio key with live pre-flight key verification, client-only persistence, and zero rate limits.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -89,7 +93,7 @@ flowchart TD
 | Layer | Technologies |
 |---|---|
 | **Frontend** | React 19, TypeScript, Tailwind CSS v4, Radix UI, Lucide Icons, React Router v7 |
-| **Audio Engine** | Web Audio API, `ScriptProcessorNode` / `AudioContext`, Int16/Float32 PCM pipeline |
+| **Audio Engine** | Web Audio API, `ScriptProcessorNode` / `AudioContext`, Int16/Float32 PCM pipeline, 7-band parametric EQ |
 | **Backend** | Bun runtime, Express 5, `ws` WebSocket Server, Zod validation |
 | **Database & ORM** | PostgreSQL, Prisma ORM with typed relations and cascade constraints |
 | **AI Models** | `gemini-3.1-flash-live-preview` (Voice Live API) & `gemini-flash-latest` (Structured Evaluation) |
@@ -139,6 +143,11 @@ GEMINI_EVAL_MODEL="gemini-flash-latest"
 # Server Ports & CORS
 PORT=3001
 CORS_ORIGIN="http://localhost:3000"
+
+# Optional: Hosted Demo Limits (Adjust anytime in Render/local env)
+DEMO_DAILY_INTERVIEW_LIMIT=15
+DEMO_RATE_LIMIT_WINDOW_HOURS=24
+GENERAL_API_RATE_LIMIT_PER_MIN=100
 
 # Optional: Increases GitHub API rate limit from 60 to 5,000 req/hr
 # GITHUB_TOKEN="ghp_your_personal_access_token"

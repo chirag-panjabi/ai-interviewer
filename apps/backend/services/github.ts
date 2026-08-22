@@ -138,21 +138,25 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
     );
 
     const reposData = Array.isArray(reposRes.data) ? reposRes.data : [];
-    const nonForkRepos = reposData.filter((r: any) => !r.fork);
     
-    // Sort by stars descending
-    nonForkRepos.sort((a: any, b: any) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+    // Sort: Non-forks first, then by stars descending, then by update time
+    const sortedRepos = [...reposData].sort((a: any, b: any) => {
+      if (Boolean(a.fork) !== Boolean(b.fork)) {
+        return a.fork ? 1 : -1;
+      }
+      return (b.stargazers_count || 0) - (a.stargazers_count || 0);
+    });
 
     // If user provided a specific repoName, move it to the top
     if (repoName) {
-      const idx = nonForkRepos.findIndex((r: any) => r.name.toLowerCase() === repoName.toLowerCase());
+      const idx = sortedRepos.findIndex((r: any) => r.name.toLowerCase() === repoName.toLowerCase());
       if (idx > 0) {
-        const [target] = nonForkRepos.splice(idx, 1);
-        if (target) nonForkRepos.unshift(target);
+        const [target] = sortedRepos.splice(idx, 1);
+        if (target) sortedRepos.unshift(target);
       }
     }
 
-    const previewRepos: GithubRepoPreview[] = nonForkRepos.slice(0, 8).map((r: any) => ({
+    const previewRepos: GithubRepoPreview[] = sortedRepos.slice(0, 8).map((r: any) => ({
       name: r.name,
       description: r.description || null,
       language: r.language || null,
@@ -233,8 +237,12 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
     );
 
     const reposData = Array.isArray(reposRes.data) ? reposRes.data : [];
-    const nonForkRepos = reposData.filter((repo: any) => !repo.fork);
-    nonForkRepos.sort((a: any, b: any) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+    const sortedRepos = [...reposData].sort((a: any, b: any) => {
+      if (Boolean(a.fork) !== Boolean(b.fork)) {
+        return a.fork ? 1 : -1;
+      }
+      return (b.stargazers_count || 0) - (a.stargazers_count || 0);
+    });
 
     // Determine target repos to fetch README
     const reposToFetchReadme: string[] = [];
@@ -244,7 +252,7 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
     } else {
       // Fetch README for top 1-2 starred repos
       const limit = config.GITHUB_TOKEN ? 2 : 1;
-      nonForkRepos.slice(0, limit).forEach((r: any) => reposToFetchReadme.push(r.name));
+      sortedRepos.slice(0, limit).forEach((r: any) => reposToFetchReadme.push(r.name));
     }
 
     const readmeMap = new Map<string, string>();
@@ -273,7 +281,7 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
       })
     );
 
-    const repos: GithubRepo[] = nonForkRepos.map((repo: any) => ({
+    const repos: GithubRepo[] = sortedRepos.map((repo: any) => ({
       name: repo.name,
       description: repo.description || null,
       language: repo.language || null,

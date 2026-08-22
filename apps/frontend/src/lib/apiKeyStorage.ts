@@ -51,16 +51,17 @@ export function validateApiKeyFormat(key: string): { isValid: boolean; error?: s
   if (!trimmed) {
     return { isValid: false, error: "API key cannot be empty." };
   }
-  if (!trimmed.startsWith("AIzaSy")) {
+  if (trimmed.length < 15) {
     return {
       isValid: false,
-      error: "Invalid Google API key format. Google Gemini keys start with 'AIzaSy...'",
+      error: "API key is too short. Please paste a valid Google Gemini API key.",
     };
   }
-  if (trimmed.length < 35 || trimmed.length > 45) {
+  // Catch wrong token types like OpenAI (sk-...) or GitHub (ghp_...)
+  if (trimmed.startsWith("sk-") || trimmed.startsWith("ghp_") || trimmed.startsWith("gho_")) {
     return {
       isValid: false,
-      error: "Unexpected key length. Standard Google AI Studio keys are ~39 characters.",
+      error: "This looks like an OpenAI or GitHub token. Please enter a Google Gemini API key.",
     };
   }
   return { isValid: true };

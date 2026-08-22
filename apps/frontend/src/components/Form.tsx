@@ -22,6 +22,10 @@ import {
   Cloud,
   Brain,
   Check,
+  Star,
+  Code,
+  FolderGit2,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +40,23 @@ type InterviewTrack =
   | "BEHAVIORAL"
   | "DEVOPS_CLOUD"
   | "ML_AI";
+
+interface RepoPreview {
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  url: string;
+}
+
+interface ProfilePreview {
+  username: string;
+  name: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  publicReposCount: number;
+  repos: RepoPreview[];
+}
 
 const EXPERIENCE_LEVELS: Array<{
   id: ExperienceLevel;
@@ -126,18 +147,28 @@ export function Form() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const navigate = useNavigate();
 
+  // GitHub Preview and Selected Repo State
+  const [profilePreview, setProfilePreview] = useState<ProfilePreview | null>(null);
+  const [fetchingPreview, setFetchingPreview] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  const [isGeneralDomainOnly, setIsGeneralDomainOnly] = useState(false);
+  const [customRepoInput, setCustomRepoInput] = useState("");
+  const [isCustomMode, setIsCustomMode] = useState(false);
+
+  const navigate = useNavigate();
   const timersRef = useRef<NodeJS.Timeout[]>([]);
   const apiIdRef = useRef<string | null>(null);
   const minTimeElapsedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const selectedTrackObj = TRACKS.find((t) => t.id === track);
   const selectedLevelObj = EXPERIENCE_LEVELS.find((l) => l.id === experienceLevel);
 
   const loadingSteps = [
-    "Fetching GitHub profile & public repositories...",
-    "Analyzing project architecture & code history...",
+    "Fetching GitHub profile & target project architecture...",
+    "Analyzing code structure & dependencies...",
     `Calibrating ${selectedLevelObj?.label || "Mid-Level"} ${selectedTrackObj?.title || "Full-Stack"} persona...`,
     "Preparing live audio interview room...",
   ];
@@ -145,25 +176,88 @@ export function Form() {
   useEffect(() => {
     return () => {
       timersRef.current.forEach(clearTimeout);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
 
-  function validateInput(value: string): boolean {
+  function parseInput(value: string): { isValid: boolean; username: string; repo?: string } {
     const trimmed = value.trim();
-    if (!trimmed) {
-      setValidationError("Please enter your GitHub username or profile URL");
-      return false;
+    if (!trimmed) return { isValid: false, username: "" };
+
+    let cleaned = trimmed.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/^github\.com\//i, "");
+    cleaned = cleaned.split("?")[0]!.split("#")[0]!.replace(/\.git$/i, "");
+    const parts = cleaned.split("/").filter(Boolean);
+
+    if (parts.length === 0) return { isValid: false, username: "" };
+    const username = parts[0]!;
+    const isUsernameValid = /^[a-zA-Z0-9_-]+$/.test(username);
+
+    if (!isUsernameValid) return { isValid: false, username: "" };
+
+    const repo = parts.length >= 2 && !["tab", "repositories", "stars"].includes(parts[1]!) ? parts[1] : undefined;
+    return { isValid: true, username, repo };
+  }
+
+  // Trigger preview fetch on debounced input change or onBlur
+  async function triggerPreviewFetch(inputVal: string) {
+    const { isValid, username, repo } = parseInput(inputVal);
+    if (!isValid || !username) {
+      setProfilePreview(null);
+      return;
     }
 
-    // Must be either a valid GitHub URL or a valid username
-    const isGithubUrl = /^(https?:\/\/)?(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?.*$/i.test(trimmed);
-    const isUsername = /^[a-zA-Z0-9_-]+$/.test(trimmed);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-    if (!isGithubUrl && !isUsername) {
-      setValidationError("Please enter a valid GitHub username (e.g. 'torvalds') or URL");
+    setFetchingPreview(true);
+
+    try {
+      const res = await axios.post(
+        `${BACKEND_URL}/api/v1/github-preview`,
+        { github: inputVal.trim() },
+        { signal: controller.signal }
+      );
+
+      const previewData: ProfilePreview = res.data;
+      setProfilePreview(previewData);
+
+      // If user pasted a direct repo URL, auto-select that repo
+      if (repo) {
+        setSelectedRepo(repo);
+        setIsGeneralDomainOnly(false);
+        setIsCustomMode(false);
+      } else if (!selectedRepo && !isGeneralDomainOnly && !isCustomMode && previewData.repos.length > 0) {
+        // Default to top starred repo
+        setSelectedRepo(previewData.repos[0]?.name || null);
+      }
+    } catch (err: any) {
+      if (axios.isCancel(err)) return;
+      console.warn("Could not fetch preview:", err?.message);
+    } finally {
+      setFetchingPreview(false);
+    }
+  }
+
+  function handleGithubChange(val: string) {
+    setGithub(val);
+    if (validationError) setValidationError(null);
+
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      triggerPreviewFetch(val);
+    }, 700);
+  }
+
+  function validateInput(value: string): boolean {
+    const { isValid } = parseInput(value);
+    if (!isValid) {
+      setValidationError("Please enter a valid GitHub username (e.g. 'torvalds') or repository URL");
       return false;
     }
-
     setValidationError(null);
     return true;
   }
@@ -201,11 +295,22 @@ export function Form() {
 
     timersRef.current.push(t1, t2, t3, tMin);
 
+    // Determine target selected repo (if any)
+    let finalSelectedRepo: string | undefined = undefined;
+    if (!isGeneralDomainOnly) {
+      if (isCustomMode && customRepoInput.trim()) {
+        finalSelectedRepo = customRepoInput.trim();
+      } else if (selectedRepo) {
+        finalSelectedRepo = selectedRepo;
+      }
+    }
+
     try {
       const response = await axios.post(`${BACKEND_URL}/api/v1/pre-interview`, {
         github: github.trim(),
         experienceLevel,
         track,
+        selectedRepo: finalSelectedRepo,
       });
       tryNavigate(response.data.id);
     } catch (e: any) {
@@ -336,11 +441,17 @@ export function Form() {
           </div>
         </div>
 
-        {/* Step 3: Enter GitHub Profile & Launch */}
+        {/* Step 3: GitHub Profile & Flagship Project Selection */}
         <div className="mt-6 w-full text-left">
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            3. GitHub Profile for Project Context
-          </label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              3. GitHub Profile & Project Context
+            </label>
+            <span className="text-[11px] text-muted-foreground/80">
+              Profile or direct repo link
+            </span>
+          </div>
+
           <div
             className={cn(
               "flex items-center gap-2 rounded-xl border bg-card/60 p-2 shadow-sm backdrop-blur transition-all",
@@ -354,15 +465,16 @@ export function Form() {
             </div>
             <Input
               value={github}
-              placeholder="https://github.com/username or username"
-              onChange={(e) => {
-                setGithub(e.target.value);
-                if (validationError) setValidationError(null);
-              }}
+              placeholder="github.com/username or username/repo"
+              onChange={(e) => handleGithubChange(e.target.value)}
+              onBlur={() => triggerPreviewFetch(github)}
               onKeyDown={(e) => e.key === "Enter" && !loading && onSubmit()}
               disabled={loading}
               className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-sm"
             />
+            {fetchingPreview && (
+              <Loader2 className="size-4 animate-spin text-muted-foreground mr-1" />
+            )}
             <Button
               disabled={loading}
               onClick={onSubmit}
@@ -387,6 +499,168 @@ export function Form() {
             <p className="mt-2 text-left text-xs font-medium text-destructive">
               {validationError}
             </p>
+          )}
+
+          {/* Interactive Project / Repository Selector */}
+          {profilePreview && profilePreview.repos.length > 0 && (
+            <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <FolderGit2 className="size-3.5 text-primary" />
+                  Select flagship project for Alex to discuss (or skip):
+                </span>
+                {profilePreview.name && (
+                  <span className="text-[11px] text-foreground/80 font-normal">
+                    @{profilePreview.username} ({profilePreview.publicReposCount} public repos)
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {/* General Domain Screen Option */}
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setIsGeneralDomainOnly(true);
+                    setIsCustomMode(false);
+                    setSelectedRepo(null);
+                  }}
+                  className={cn(
+                    "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                    isGeneralDomainOnly
+                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                      : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                    loading && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
+                    <Globe className="size-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">
+                        General Domain Screen
+                      </span>
+                      {isGeneralDomainOnly && (
+                        <Check className="size-3 text-primary stroke-[3]" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground line-clamp-1">
+                      Skip project questions; launch directly into domain scenarios
+                    </p>
+                  </div>
+                </button>
+
+                {/* Candidate Public Repositories (Top 6) */}
+                {profilePreview.repos.slice(0, 5).map((r) => {
+                  const isSelected = !isGeneralDomainOnly && !isCustomMode && selectedRepo === r.name;
+                  return (
+                    <button
+                      key={r.name}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setSelectedRepo(r.name);
+                        setIsGeneralDomainOnly(false);
+                        setIsCustomMode(false);
+                      }}
+                      className={cn(
+                        "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                          : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                        loading && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-foreground/70">
+                        <Code className="size-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {r.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {r.stars > 0 && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-amber-400 font-medium">
+                                <Star className="size-2.5 fill-amber-400" />
+                                {r.stars}
+                              </span>
+                            )}
+                            {isSelected && (
+                              <Check className="size-3 text-primary stroke-[3]" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                          {r.language && (
+                            <span className="font-medium text-foreground/70">
+                              {r.language}
+                            </span>
+                          )}
+                          <span className="truncate">
+                            {r.description || "No description provided"}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Custom Repo Option */}
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setIsCustomMode(true);
+                    setIsGeneralDomainOnly(false);
+                    setSelectedRepo(null);
+                  }}
+                  className={cn(
+                    "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                    isCustomMode
+                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                      : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
+                    loading && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-primary">
+                    <Plus className="size-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">
+                        Other Public Repo...
+                      </span>
+                      {isCustomMode && (
+                        <Check className="size-3 text-primary stroke-[3]" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground line-clamp-1">
+                      Enter any repository not listed above
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Inline input if Custom Repo is chosen */}
+              {isCustomMode && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/50 bg-card/80 p-1.5 animate-in fade-in duration-150">
+                  <span className="pl-2 text-xs font-medium text-muted-foreground">
+                    Repo Name:
+                  </span>
+                  <Input
+                    value={customRepoInput}
+                    placeholder="e.g. distributed-kv-store"
+                    onChange={(e) => setCustomRepoInput(e.target.value)}
+                    disabled={loading}
+                    className="h-8 border-0 bg-transparent text-xs focus-visible:ring-0"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {/* Animated Ingestion Stepper */}

@@ -139,14 +139,27 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
           const rawName = meta.name || meta.username || "Candidate";
           candidateDisplayName = rawName.split(/[-_]/)[0] || rawName;
 
+          const chosenRepoName = meta.selectedRepo || null;
+
           if (Array.isArray(meta.repos) && meta.repos.length > 0) {
             hasValidRepos = true;
-            const reposList = meta.repos
+            
+            // If candidate explicitly chose a repo, place it first in the list
+            const sortedRepos = [...meta.repos];
+            if (chosenRepoName) {
+              const idx = sortedRepos.findIndex((r: any) => r.name.toLowerCase() === chosenRepoName.toLowerCase());
+              if (idx > 0) {
+                const [target] = sortedRepos.splice(idx, 1);
+                if (target) sortedRepos.unshift(target);
+              }
+            }
+
+            const reposList = sortedRepos
               .slice(0, 8)
               .map((r: any) => {
-                let text = `- ${r.name} (${r.language || "General"}): ${r.description || "No description"} [Topics: ${(r.topics || []).join(", ") || "none"}]`;
+                let text = `- ${r.name} (${r.language || "General"}): ${r.description || "No description"} [Stars: ${r.stars || 0}, Topics: ${(r.topics || []).join(", ") || "none"}]`;
                 if (r.readme) {
-                  text += `\n  README Summary: ${r.readme.slice(0, 400).replace(/\n+/g, " ")}...`;
+                  text += `\n  <untrusted_candidate_repo_context>\n  README (truncated): ${r.readme.slice(0, 1000).replace(/\n+/g, " ")}\n  </untrusted_candidate_repo_context>`;
                 }
                 return text;
               })
@@ -155,6 +168,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
             candidateProfileSummary = `Candidate Username: ${meta.username || "Candidate"}
 Candidate Spoken Name: ${candidateDisplayName}
 Bio: ${meta.bio || "None provided"}
+${chosenRepoName ? `Candidate Explicitly Selected Flagship Project: "${chosenRepoName}"` : ""}
 Public Repositories:
 ${reposList}`;
           }
@@ -178,6 +192,9 @@ ${reposList}`;
         candidateDisplayName,
         candidateProfileSummary,
         hasValidRepos,
+        selectedRepo: typeof interview.githubMetadata === "string" 
+          ? (() => { try { return JSON.parse(interview.githubMetadata).selectedRepo || null; } catch { return null; } })()
+          : (interview.githubMetadata as any)?.selectedRepo || null,
       });
 
       if (isResumingSession) {

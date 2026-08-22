@@ -1,5 +1,10 @@
 import axios from "axios";
+import https from "https";
 import { config } from "../config";
+
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: process.env.NODE_ENV === "production",
+});
 
 export interface GithubRepo {
   name: string;
@@ -11,34 +16,173 @@ export interface GithubRepo {
   readme?: string | null;
 }
 
+export interface GithubRepoPreview {
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  url: string;
+}
+
+export interface GithubProfilePreview {
+  username: string;
+  name: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  publicReposCount: number;
+  repos: GithubRepoPreview[];
+}
+
 export interface GithubPortfolio {
   username: string;
   name: string | null;
   bio: string | null;
   publicReposCount: number;
+  selectedRepo?: string | null;
   repos: GithubRepo[];
 }
 
-export function parseGithubUsername(input: string): string {
+// In-memory cache for preview queries with a 10-minute TTL
+interface CacheEntry {
+  timestamp: number;
+  data: GithubProfilePreview;
+}
+const previewCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+export function parseGithubInput(input: string): { username: string; repoName?: string } {
   let cleaned = input.trim();
-  // Remove protocol
+  
+  // Remove leading @ symbol if user types "@username" or "@username/repo"
+  if (cleaned.startsWith("@")) {
+    cleaned = cleaned.slice(1);
+  }
+
+  // Handle SSH format: git@github.com:owner/repo.git
+  if (cleaned.startsWith("git@github.com:")) {
+    cleaned = cleaned.replace("git@github.com:", "");
+  }
+
+  // Remove protocols and domain
   cleaned = cleaned.replace(/^https?:\/\//i, "");
-  // Remove domain
+  cleaned = cleaned.replace(/^www\./i, "");
   cleaned = cleaned.replace(/^github\.com\//i, "");
+
   // Remove query params or hashes
   const withoutQuery = cleaned.split("?")[0] ?? "";
   cleaned = withoutQuery.split("#")[0] ?? "";
-  // Remove trailing slashes and take the first segment
+
+  // Remove trailing .git suffix
+  cleaned = cleaned.replace(/\.git$/i, "");
+
+  // Split path segments
   const parts = cleaned.split("/").filter(Boolean);
   const username = parts[0];
+
   if (!username) {
     throw new Error("Invalid GitHub profile URL or username");
   }
-  return username;
+
+  // If a second segment exists and isn't a subpath like 'tab', 'repositories', etc.
+  let repoName: string | undefined = undefined;
+  if (parts.length >= 2 && !["tab", "repositories", "stars", "followers", "following"].includes(parts[1]!)) {
+    repoName = parts[1];
+  }
+
+  return { username, repoName };
 }
 
-export async function scrapeGithub(input: string): Promise<GithubPortfolio> {
-  const username = parseGithubUsername(input);
+export function parseGithubUsername(input: string): string {
+  return parseGithubInput(input).username;
+}
+
+export async function getGithubReposPreview(input: string): Promise<GithubProfilePreview> {
+  const { username, repoName } = parseGithubInput(input);
+  const cacheKey = username.toLowerCase();
+  const now = Date.now();
+
+  const cached = previewCache.get(cacheKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const headers: Record<string, string> = {
+    "User-Agent": "AI-Interviewer-App",
+    Accept: "application/vnd.github.v3+json",
+  };
+
+  if (config.GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${config.GITHUB_TOKEN}`;
+  }
+
+  try {
+    const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+      headers,
+      httpsAgent,
+      timeout: 6000,
+    });
+    const userData = userRes.data;
+
+    const reposRes = await axios.get(
+      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=20`,
+      {
+        headers,
+        httpsAgent,
+        timeout: 6000,
+      }
+    );
+
+    const reposData = Array.isArray(reposRes.data) ? reposRes.data : [];
+    const nonForkRepos = reposData.filter((r: any) => !r.fork);
+    
+    // Sort by stars descending
+    nonForkRepos.sort((a: any, b: any) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+
+    // If user provided a specific repoName, move it to the top
+    if (repoName) {
+      const idx = nonForkRepos.findIndex((r: any) => r.name.toLowerCase() === repoName.toLowerCase());
+      if (idx > 0) {
+        const [target] = nonForkRepos.splice(idx, 1);
+        if (target) nonForkRepos.unshift(target);
+      }
+    }
+
+    const previewRepos: GithubRepoPreview[] = nonForkRepos.slice(0, 8).map((r: any) => ({
+      name: r.name,
+      description: r.description || null,
+      language: r.language || null,
+      stars: r.stargazers_count || 0,
+      url: r.html_url,
+    }));
+
+    const result: GithubProfilePreview = {
+      username: userData.login || username,
+      name: userData.name || null,
+      bio: userData.bio || null,
+      avatarUrl: userData.avatar_url || null,
+      publicReposCount: userData.public_repos || previewRepos.length,
+      repos: previewRepos,
+    };
+
+    previewCache.set(cacheKey, { timestamp: now, data: result });
+    return result;
+  } catch (err: any) {
+    console.warn(`[GitHubPreview] Could not fetch preview for ${username}: ${err?.response?.data?.message || err.message}`);
+    // Return graceful fallback without breaking frontend
+    return {
+      username,
+      name: username,
+      bio: null,
+      avatarUrl: null,
+      publicReposCount: 0,
+      repos: [],
+    };
+  }
+}
+
+export async function scrapeGithub(input: string, explicitSelectedRepo?: string): Promise<GithubPortfolio> {
+  const { username, repoName: parsedRepoName } = parseGithubInput(input);
+  const targetRepoName = explicitSelectedRepo || parsedRepoName;
 
   const headers: Record<string, string> = {
     "User-Agent": "AI-Interviewer-App",
@@ -53,48 +197,57 @@ export async function scrapeGithub(input: string): Promise<GithubPortfolio> {
     // Fetch user profile info
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
+      httpsAgent,
       timeout: 10000,
     });
 
     const userData = userRes.data;
 
-    // Fetch user repos (up to 15 most recently updated)
+    // Fetch user repos (up to 20 most recently updated)
     const reposRes = await axios.get(
-      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=15`,
+      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=20`,
       {
         headers,
+        httpsAgent,
         timeout: 10000,
       }
     );
 
     const reposData = Array.isArray(reposRes.data) ? reposRes.data : [];
-
     const nonForkRepos = reposData.filter((repo: any) => !repo.fork);
-    // Sort non-fork repos by stars descending to prioritize the candidate's best work
     nonForkRepos.sort((a: any, b: any) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
 
-    // Budget: 3 repos if authenticated with GITHUB_TOKEN, 1 repo if unauthenticated (to conserve 60 req/hr rate limit)
-    const readmeLimit = config.GITHUB_TOKEN ? 3 : 1;
-    const topReposToFetchReadme = nonForkRepos.slice(0, readmeLimit);
+    // Determine target repos to fetch README
+    const reposToFetchReadme: string[] = [];
+
+    if (targetRepoName) {
+      reposToFetchReadme.push(targetRepoName);
+    } else {
+      // Fetch README for top 1-2 starred repos
+      const limit = config.GITHUB_TOKEN ? 2 : 1;
+      nonForkRepos.slice(0, limit).forEach((r: any) => reposToFetchReadme.push(r.name));
+    }
 
     const readmeMap = new Map<string, string>();
     await Promise.all(
-      topReposToFetchReadme.map(async (repo: any) => {
+      reposToFetchReadme.map(async (name: string) => {
         try {
           const readmeRes = await axios.get(
-            `https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo.name)}/readme`,
+            `https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(name)}/readme`,
             {
               headers: {
                 ...headers,
                 Accept: "application/vnd.github.v3.raw",
               },
+              httpsAgent,
               timeout: 5000,
               responseType: "text",
             }
           );
           if (typeof readmeRes.data === "string" && readmeRes.data.trim()) {
-            // Truncate to 1500 chars to respect prompt token budget
-            readmeMap.set(repo.name, readmeRes.data.trim().slice(0, 1500));
+            // Sanitize raw HTML tags and truncate to 2000 chars
+            const sanitized = readmeRes.data.replace(/<[^>]*>?/gm, "").trim().slice(0, 2000);
+            readmeMap.set(name, sanitized);
           }
         } catch {
           // Repo might not have a README or rate limit encountered; gracefully continue
@@ -117,17 +270,18 @@ export async function scrapeGithub(input: string): Promise<GithubPortfolio> {
       name: userData.name || null,
       bio: userData.bio || null,
       publicReposCount: userData.public_repos || repos.length,
+      selectedRepo: targetRepoName || null,
       repos,
     };
   } catch (err: any) {
     console.error(`Error fetching GitHub data for ${username}:`, err?.response?.data || err.message);
     
-    // Return a fallback structure with the username so the interview can proceed even if GitHub API is rate-limited
     return {
       username,
       name: username,
       bio: null,
       publicReposCount: 0,
+      selectedRepo: targetRepoName || null,
       repos: [],
     };
   }

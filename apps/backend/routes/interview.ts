@@ -1,13 +1,30 @@
 import { Router } from "express";
 import { PreInterviewBody } from "../types";
-import { scrapeGithub } from "../services/github";
+import { scrapeGithub, getGithubReposPreview } from "../services/github";
 import { prisma } from "../db";
 import { calculateResult } from "../services/evaluation";
 import { interviewCreationLimiter } from "../middleware/rateLimiter";
 
 export const interviewRouter = Router();
 
-// 1. Ingest GitHub profile and initialize interview (Rate limited to 15 / day / IP)
+// 1. Preview candidate GitHub repositories (Cached, fast response)
+interviewRouter.post("/github-preview", async (req, res) => {
+  const { github } = req.body;
+  if (!github || typeof github !== "string" || !github.trim()) {
+    res.status(400).json({ message: "GitHub username or URL is required." });
+    return;
+  }
+
+  try {
+    const preview = await getGithubReposPreview(github.trim());
+    res.json(preview);
+  } catch (err: any) {
+    console.error("Error fetching github preview:", err?.message);
+    res.status(500).json({ message: "Could not fetch GitHub repositories preview." });
+  }
+});
+
+// 2. Ingest GitHub profile and initialize interview (Rate limited to 15 / day / IP)
 interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
   const { success, data } = PreInterviewBody.safeParse(req.body);
 
@@ -19,13 +36,13 @@ interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res
   }
 
   try {
-    const githubData = await scrapeGithub(data.github);
+    const githubData = await scrapeGithub(data.github, data.selectedRepo);
 
     const interview = await prisma.interview.create({
       data: {
         githubMetadata: JSON.stringify(githubData),
         experienceLevel: data.experienceLevel,
-        track: data.track,
+        track: data.track as any,
         status: "CREATED",
       },
     });

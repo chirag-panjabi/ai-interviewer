@@ -13,6 +13,7 @@ export interface PromptConfig {
   candidateDisplayName: string;
   candidateProfileSummary: string;
   hasValidRepos: boolean;
+  selectedRepo?: string | null;
 }
 
 interface TrackDomainConfig {
@@ -28,6 +29,7 @@ export function buildSystemPrompt(config: PromptConfig): string {
     candidateDisplayName,
     candidateProfileSummary,
     hasValidRepos,
+    selectedRepo,
   } = config;
 
   // --- SECTION A: Persona Calibration by Level ---
@@ -39,33 +41,34 @@ export function buildSystemPrompt(config: PromptConfig): string {
 
   if (experienceLevel === "JUNIOR") {
     interviewerTitle = "Senior Software Engineer";
-    companyTier = "a respected modern technology company";
-    toneGuidance = "clear, structured, foundational, and patient";
+    companyTier = "a top-tier technology company";
+    toneGuidance = "welcoming, supportive, yet rigorous on fundamentals";
     probingStyle =
-      "Probe foundational mechanics, data flow, syntax clarity, and clean coding practices. If the candidate struggles, ask a simpler clarifying question or pivot cleanly, but NEVER give away the answer.";
+      "Briefly acknowledge their answer and probe core data structures, API handling, and debugging logic.";
   } else if (experienceLevel === "SENIOR") {
     interviewerTitle = "Principal Software Engineer";
     companyTier = "a Tier-1 technology leader (such as Google, Stripe, or Meta)";
-    toneGuidance = "rigorous, razor-sharp, highly technical, and deeply probing";
+    toneGuidance = "direct, incisive, intellectually demanding, and peer-to-peer";
     probingStyle =
-      "Actively challenge architectural boundaries, distributed failure modes, race conditions, consensus trade-offs, and edge cases. Never accept buzzwords without probing underlying implementation mechanics.";
+      "Micro-ground in under 8 words, then immediately challenge trade-offs, catastrophic edge cases, and high-concurrency production limits.";
   }
 
   // --- SECTION B: Track-Specific Depth Themes ---
-  const domainConfig = getTrackDomainConfig(track, experienceLevel, candidateDisplayName, hasValidRepos);
+  const domainConfig = getTrackDomainConfig(track, experienceLevel, candidateDisplayName, hasValidRepos, selectedRepo);
 
-  return `You are Alex, a ${interviewerTitle} at ${companyTier}, conducting an authentic, live 1-on-1 technical interview for the **${domainConfig.trackName}** track.
-Target Experience Level: **${experienceLevel}** (${experienceLevel === "JUNIOR" ? "0-2 years" : experienceLevel === "SENIOR" ? "5+ years" : "2-5 years"}).
+  return `You are Alex, a ${interviewerTitle} at ${companyTier}, conducting an authentic, live 1-on-1 technical interview for the **${domainConfig.trackName.toUpperCase()}** track.
+Target Experience Level: **${experienceLevel}** (${experienceLevel === "JUNIOR" ? "0-2 years" : experienceLevel === "MID" ? "2-5 years" : "5+ years"}).
 
 ### CANDIDATE CONTEXT:
 Candidate Spoken Name: ${candidateDisplayName}
+${selectedRepo ? `Candidate Chosen Project to Discuss: "${selectedRepo}"` : ""}
 ${candidateProfileSummary}
-${hasValidRepos ? "The candidate has public GitHub repositories listed above. Use them for concrete initial grounding only if relevant to the track." : "NOTE: No public GitHub repositories available. Start directly with an authentic domain engineering scenario."}
+${selectedRepo ? `The candidate has explicitly selected their project "${selectedRepo}" to present today. Open the interview by greeting ${candidateDisplayName} and asking a technical question directly about the architecture and implementation of "${selectedRepo}".` : hasValidRepos ? "The candidate has public GitHub repositories listed above. Use them for concrete initial grounding only if relevant to the track." : "NOTE: No public GitHub repositories available. Start directly with an authentic domain engineering scenario."}
 
 ### ADAPTIVE DEEP-DIVE INTERVIEW PHILOSOPHY:
 You are a genuine Staff Engineer conducting an organic technical screen. You do NOT follow a rigid scripted checklist. Instead, you follow a **Multi-Layer Depth Drill-Down Model**:
 1. **Initial Grounding (At most 2 to 3 turns)**:
-   - ${domainConfig.openingScenario}
+   - ${selectedRepo ? `Briefly greet ${candidateDisplayName}, cite their chosen project "${selectedRepo}", and ask how they architected its core components and data lifecycle.` : domainConfig.openingScenario}
    - Spend AT MOST 2 to 3 turns on their project, then transition smoothly: "Great context on how you built that. Let's zoom out to broader architectural and engineering concepts in ${domainConfig.trackName}."
 2. **The 3-Layer Depth Drill (For every technical topic)**:
    - **Layer 1 (The Decision / Approach)**: Why did the candidate choose this architecture, pattern, or data structure over alternatives?
@@ -114,7 +117,8 @@ function getTrackDomainConfig(
   track: string,
   level: "JUNIOR" | "MID" | "SENIOR",
   candidateName: string,
-  hasRepos: boolean
+  hasRepos: boolean,
+  selectedRepo?: string | null
 ): TrackDomainConfig {
   switch (track) {
     case "BACKEND":

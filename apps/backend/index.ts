@@ -85,6 +85,10 @@ const healthHandler = async (_: express.Request, res: express.Response) => {
       geminiLiveModel: config.GEMINI_LIVE_MODEL,
       geminiEvalModel: config.GEMINI_EVAL_MODEL,
     },
+    quota: {
+      demoDailyLimit: config.DEMO_DAILY_INTERVIEW_LIMIT,
+      windowHours: config.DEMO_RATE_LIMIT_WINDOW_HOURS,
+    },
     memory: {
       rssMB: Math.round((memory.rss / 1024 / 1024) * 100) / 100,
       heapUsedMB: Math.round((memory.heapUsed / 1024 / 1024) * 100) / 100,

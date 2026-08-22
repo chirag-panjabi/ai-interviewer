@@ -14,14 +14,24 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
+function getIntEnv(key: string, defaultValue: number): number {
+  const raw = process.env[key];
+  if (!raw) return defaultValue;
+  const parsed = parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
 export const config = {
   DATABASE_URL: getEnv("DATABASE_URL"),
   GEMINI_API_KEY: getEnv("GEMINI_API_KEY"),
   GEMINI_LIVE_MODEL: getEnv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
   GEMINI_EVAL_MODEL: getEnv("GEMINI_EVAL_MODEL", "gemini-flash-latest"),
   GITHUB_TOKEN: process.env.GITHUB_TOKEN ? process.env.GITHUB_TOKEN.trim().replace(/^["']|["']$/g, "") : undefined,
-  PORT: parseInt(getEnv("PORT", "3001"), 10),
+  PORT: getIntEnv("PORT", 3001),
   CORS_ORIGIN: getEnv("CORS_ORIGIN", "http://localhost:3000"),
+  DEMO_DAILY_INTERVIEW_LIMIT: getIntEnv("DEMO_DAILY_INTERVIEW_LIMIT", 15),
+  DEMO_RATE_LIMIT_WINDOW_HOURS: getIntEnv("DEMO_RATE_LIMIT_WINDOW_HOURS", 24),
+  GENERAL_API_RATE_LIMIT_PER_MIN: getIntEnv("GENERAL_API_RATE_LIMIT_PER_MIN", 100),
 };
 
 export function validateConfig() {
@@ -39,4 +49,6 @@ export function validateConfig() {
   } else {
     console.warn(`⚠️  [GitHub Auth] GITHUB_TOKEN is not set. Requests will use the unauthenticated 60 req/hr IP rate limit.`);
   }
+
+  console.log(`🛡️  [Hosted Quota] Demo limit: ${config.DEMO_DAILY_INTERVIEW_LIMIT} interviews / IP / ${config.DEMO_RATE_LIMIT_WINDOW_HOURS}h (BYOK keys unlimited)`);
 }

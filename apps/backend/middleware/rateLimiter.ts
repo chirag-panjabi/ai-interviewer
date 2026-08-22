@@ -1,18 +1,19 @@
 import { rateLimit } from "express-rate-limit";
+import { config } from "../config";
 
-// General API Rate Limiting (100 req/min per IP)
+// General API Rate Limiting (Configurable per IP)
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 100,
+  limit: config.GENERAL_API_RATE_LIMIT_PER_MIN,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { message: "Too many requests from this IP, please try again shortly." },
 });
 
-// Strict Rate Limiting on Interview Creation (15 interviews per IP per 24 hours for hosted demo tier)
+// Configurable Rate Limiting on Interview Creation for Hosted Demo Tier
 export const interviewCreationLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  limit: 15, // max 15 per day
+  windowMs: config.DEMO_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000,
+  limit: config.DEMO_DAILY_INTERVIEW_LIMIT,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   skip: (req) => {
@@ -21,6 +22,6 @@ export const interviewCreationLimiter = rateLimit({
     return Boolean(customKey && typeof customKey === "string" && customKey.trim().length >= 15);
   },
   message: {
-    message: "You have reached the daily hosted demo limit (15 interviews per day). Please provide your own free Gemini API key to continue practicing.",
+    message: `You have reached the hosted demo limit (${config.DEMO_DAILY_INTERVIEW_LIMIT} interviews per ${config.DEMO_RATE_LIMIT_WINDOW_HOURS}h). Please provide your own free Gemini API key to continue practicing.`,
   },
 });

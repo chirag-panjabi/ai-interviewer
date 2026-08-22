@@ -38,30 +38,31 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
   FULLSTACK_GENERAL: {
     JUNIOR: {
       trackName: "Full-Stack General",
-      rolePersona: "Principal Staff Engineer evaluating a Junior Full-Stack Engineer (0-2 years)",
+      rolePersona: "Strict Staff Engineer evaluating an Entry-Level Full-Stack Developer (0-2 years)",
       focusDomain: "Foundational REST APIs, basic database CRUD, component state, and asynchronous data flow.",
-      categoryDefinitions: `1. **Technical Accuracy**: Correct understanding of HTTP methods (GET/POST/PUT/DELETE), status codes, basic SQL queries/joins, and React state/props flow.
+      categoryDefinitions: `1. **Technical Accuracy**: Correct understanding of HTTP methods, status codes, basic SQL queries/joins, and React state/props flow.
 2. **Problem Solving**: Ability to reason through simple end-to-end bugs, network error handling, and form validation logic.
 3. **Communication**: Clear, structured explanations of how their frontend connects to the backend and database.
 4. **Engineering Depth**: Basic code cleanliness, separation of concerns, and foundational CS understanding (e.g. basic Big-O).`,
       scoreBands: {
-        noHire: "Cannot explain basic HTTP conventions, confused about frontend vs backend boundaries, or unable to write/trace simple database CRUD.",
-        leanNoHire: "Recites terminology (e.g. 'useEffect', 'foreign key') but struggles to explain how data actually flows from UI to database.",
-        hire: "Solid fundamentals: cleanly explains REST endpoints, database schema design for simple apps, and component state lifecycle. Ready for production junior contribution.",
-        strongHire: "Exceeds junior expectations: demonstrates architectural awareness, discusses caching or indexing basics, and reasons well about error edge cases.",
+        noHire: "Score 0.0 - 2.5: Cannot explain basic HTTP conventions, confused about frontend vs backend boundaries, admits lack of core CS/frontend fundamentals, or gives nonsensical/gibberish answers.",
+        leanNoHire: "Score 2.6 - 4.5: Recites high-level buzzwords ('useEffect', 'foreign key') but struggles to explain how data actually flows from UI to database without spoon-fed hints.",
+        hire: "Score 4.6 - 6.5: Solid fundamentals: independently explains REST endpoints, database schema design for simple apps, and component state lifecycle without interviewer help.",
+        strongHire: "Score 6.6 - 10.0: Exceeds junior expectations: demonstrates architectural awareness, discusses caching or indexing basics, and reasons well about error edge cases.",
       },
       greenFlags: [
-        "Clearly separates client state from server state",
+        "Clearly separates client state from server state without being prompted",
         "Understands basic SQL relations (1-to-many, foreign keys) or Document store schemas",
         "Handles loading and error states in UI gracefully",
         "Knows how to inspect network requests and debug API errors",
       ],
       redFlags: [
-        "Storing sensitive API keys or database credentials in frontend client bundles",
+        "Admitting lack of knowledge on core stack areas (e.g. no frontend, no databases)",
         "Confusing server-side execution with client-side execution",
         "Unable to explain what happens when an API request fails",
+        "Using nonsensical terminology or placeholder audio responses",
       ],
-      adaptiveNotes: "Do not penalize for missing distributed consensus or DB sharding knowledge. Reward candidate if they handled mid-level caching or queue questions well.",
+      adaptiveNotes: "Hold the candidate to genuine entry-level engineering standards. Do not award participation credit for repeating interviewer hints.",
     },
     MID: {
       trackName: "Full-Stack General",
@@ -72,10 +73,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Articulate trade-off discussions (SQL vs NoSQL, Server Components vs Client Components, REST vs GraphQL).
 4. **Engineering Depth**: Deep understanding of browser rendering lifecycle, DB connection pooling, and asynchronous event loops.`,
       scoreBands: {
-        noHire: "Lacks production depth despite experience; cannot explain how to index a database table or optimize slow queries.",
-        leanNoHire: "Relies on surface buzzwords (Kafka, Redis) without understanding cache-aside patterns, invalidation bugs, or transaction isolation.",
-        hire: "Strong production intuition: designs clean API contracts, indexes database tables effectively, uses caching with clear TTLs, handles background queues.",
-        strongHire: "Near-senior mastery: proactively identifies N+1 query bottlenecks, designs idempotent APIs, mitigates race conditions, and explains trade-offs with nuance.",
+        noHire: "Score 0.0 - 2.5: Lacks production depth; cannot explain how to index a database table, optimize slow queries, or handle API errors.",
+        leanNoHire: "Score 2.6 - 4.5: Relies on surface buzzwords (Kafka, Redis) without understanding cache-aside patterns, invalidation bugs, or transaction isolation.",
+        hire: "Score 4.6 - 6.5: Strong production intuition: independently designs clean API contracts, indexes database tables effectively, uses caching with clear TTLs, handles background queues.",
+        strongHire: "Score 6.6 - 10.0: Near-senior mastery: proactively identifies N+1 query bottlenecks, designs idempotent APIs, mitigates race conditions, and explains trade-offs with nuance.",
       },
       greenFlags: [
         "Proactively discusses database query plans (EXPLAIN) and indexing strategies",
@@ -87,8 +88,9 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "Performing heavy computations or synchronous blocking calls in API request threads",
         "Blindly adding Redis caching without an invalidation or TTL strategy",
         "Ignoring optimistic concurrency and database race conditions",
+        "Relying on the interviewer to supply architectural choices",
       ],
-      adaptiveNotes: "Anchor evaluation on mid-level production standards. Reward candidate if they demonstrated senior-level failure mode analysis.",
+      adaptiveNotes: "Anchor evaluation on mid-level production standards. Score strictly on unprompted technical depth.",
     },
     SENIOR: {
       trackName: "Full-Stack General",
@@ -99,10 +101,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Executive-level technical clarity, precise trade-off articulation, and strategic engineering leadership.
 4. **Engineering Depth**: Deep mastery of operating system internals, database storage engines, network socket buffering, and browser paint pipelines.`,
       scoreBands: {
-        noHire: "Unable to justify architectural boundaries, vague about database scale, or fails to anticipate distributed failure modes.",
-        leanNoHire: "Strong individual contributor knowledge but lacks deep architectural rigor when probed on multi-region scale or consistency anomalies.",
-        hire: "Senior engineering excellence: architects resilient distributed full-stack systems, designs for graceful degradation, proves deep systems depth.",
-        strongHire: "Principal-level authority: masterful dissection of distributed edge cases, cache stampedes, multi-region replication lag, and organizational impact.",
+        noHire: "Score 0.0 - 2.5: Unable to justify architectural boundaries, vague about database scale, or fails to anticipate distributed failure modes.",
+        leanNoHire: "Score 2.6 - 4.5: Strong individual contributor knowledge but lacks deep architectural rigor when probed on multi-region scale or consistency anomalies.",
+        hire: "Score 4.6 - 6.5: Senior engineering excellence: architects resilient distributed full-stack systems, designs for graceful degradation, proves deep systems depth.",
+        strongHire: "Score 6.6 - 10.0: Principal-level authority: masterful dissection of distributed edge cases, cache stampedes, multi-region replication lag, and organizational impact.",
       },
       greenFlags: [
         "Proactively addresses failure blast radius, circuit breakers, and rate limiters",
@@ -115,24 +117,24 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "Inability to explain how distributed transactions or two-phase commits work",
         "Over-engineering simple solutions without business justification",
       ],
-      adaptiveNotes: "Hold the candidate to Tier-1 industry rigor. Look for proactive identification of non-functional requirements (latency, availability, cost).",
+      adaptiveNotes: "Hold the candidate to Tier-1 industry rigor. Look for proactive identification of non-functional requirements.",
     },
   },
 
   BACKEND: {
     JUNIOR: {
       trackName: "Backend Engineering",
-      rolePersona: "Senior Backend Lead evaluating an Entry-Level Backend Engineer (0-2 years)",
+      rolePersona: "Strict Senior Backend Lead evaluating an Entry-Level Backend Engineer (0-2 years)",
       focusDomain: "RESTful API design, database schema modeling, basic SQL joins, middleware, and error handling.",
       categoryDefinitions: `1. **Technical Accuracy**: Correct implementation of HTTP status codes, routing, SQL relational queries, and input validation.
 2. **Problem Solving**: Debugging backend server errors, handling null/edge cases, and structuring clean service layers.
 3. **Communication**: Ability to walk through request-response lifecycles clearly.
-4. **Engineering Depth**: Understanding asynchronous promises, event loops, and basic authentication (JWT/Sessions).`,
+4. **Engineering Depth**: Understanding asynchronous promises, event loops, and basic authentication.`,
       scoreBands: {
-        noHire: "Unable to construct standard SQL queries, confused about API parameters, or ignores server error handling.",
-        leanNoHire: "Understands basic CRUD syntax but cannot explain how middleware or database connections work.",
-        hire: "Solid backend basics: builds clean REST endpoints, models relational schemas correctly, sanitizes inputs, handles errors gracefully.",
-        strongHire: "Exceeds junior bar: demonstrates early understanding of connection pooling, Redis caching, and unit testing backend routes.",
+        noHire: "Score 0.0 - 2.5: Unable to construct standard SQL queries, confused about API parameters, ignores server error handling, or gives nonsensical answers.",
+        leanNoHire: "Score 2.6 - 4.5: Understands basic CRUD syntax but cannot explain how middleware or database connections work without hints.",
+        hire: "Score 4.6 - 6.5: Solid backend basics: builds clean REST endpoints, models relational schemas correctly, sanitizes inputs, handles errors gracefully.",
+        strongHire: "Score 6.6 - 10.0: Exceeds junior bar: demonstrates early understanding of connection pooling, Redis caching, and unit testing backend routes.",
       },
       greenFlags: [
         "Validates and sanitizes all incoming request payloads",
@@ -142,6 +144,7 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       redFlags: [
         "Concatenating user input directly into SQL strings (SQL Injection vulnerability)",
         "Swallowing errors in catch blocks without logging or returning 500 status",
+        "Confusing backend server execution with client browsers",
       ],
       adaptiveNotes: "Focus on clean coding and security fundamentals over high-scale distributed topics.",
     },
@@ -152,12 +155,12 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       categoryDefinitions: `1. **Technical Accuracy**: In-depth knowledge of database indexing (composite indexes), isolation levels, Redis cache-aside, and message queues.
 2. **Problem Solving**: Optimizing slow database queries, handling concurrent updates, backpressure, and asynchronous task workflows.
 3. **Communication**: Structured explanation of data flow, service boundaries, and trade-offs between sync vs async operations.
-4. **Engineering Depth**: Understanding connection pooling limits, memory leaks, garbage collection pauses, and API security (CORS, Rate Limiting, OWASP).`,
+4. **Engineering Depth**: Understanding connection pooling limits, memory leaks, garbage collection pauses, and API security.`,
       scoreBands: {
-        noHire: "Fails to reason about database query performance or ignores concurrent write collisions.",
-        leanNoHire: "Uses ORMs blindly without understanding generated SQL or N+1 queries; struggles with cache invalidation.",
-        hire: "Competent mid-level engineer: optimizes indexes, manages ACID transaction boundaries, implements robust queue consumers.",
-        strongHire: "Near-senior depth: proactively introduces idempotency keys, dead-letter queues, distributed locking mechanisms (Redlock), and circuit breakers.",
+        noHire: "Score 0.0 - 2.5: Fails to reason about database query performance or ignores concurrent write collisions.",
+        leanNoHire: "Score 2.6 - 4.5: Uses ORMs blindly without understanding generated SQL or N+1 queries; struggles with cache invalidation.",
+        hire: "Score 4.6 - 6.5: Competent mid-level engineer: optimizes indexes, manages ACID transaction boundaries, implements robust queue consumers.",
+        strongHire: "Score 6.6 - 10.0: Near-senior depth: proactively introduces idempotency keys, dead-letter queues, distributed locking mechanisms, and circuit breakers.",
       },
       greenFlags: [
         "Explains query execution plans and when composite indexes are utilized",
@@ -174,15 +177,15 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       trackName: "Backend Engineering",
       rolePersona: "Principal Backend Architect evaluating a Senior / Lead Backend Engineer (5+ years)",
       focusDomain: "High-throughput distributed services, storage engine internals, consensus, fault tolerance, and event-driven architectures.",
-      categoryDefinitions: `1. **Technical Accuracy**: Deep mastery of MVCC, WAL, Raft/Paxos, message broker semantics (Kafka partition rebalancing, offset commits), and distributed locks.
+      categoryDefinitions: `1. **Technical Accuracy**: Deep mastery of MVCC, WAL, Raft/Paxos, message broker semantics, and distributed locks.
 2. **Problem Solving**: Mitigating cascading outages, handling network partitions, backpressure regulation, and multi-region data replication.
 3. **Communication**: High-clarity architectural trade-off justification (CAP theorem, PACELC, latency budgets).
 4. **Engineering Depth**: Deep understanding of kernel TCP buffers, database page cache, lock contention, and high-concurrency memory models.`,
       scoreBands: {
-        noHire: "Lacks distributed systems foundations; unable to explain partition tolerance or handle service failure cascades.",
-        leanNoHire: "Good component-level knowledge but struggles when challenged on distributed data consistency anomalies or partition splits.",
-        hire: "Senior backend leader: masterfully architects distributed services, prevents split-brain, implements graceful degradation under extreme load.",
-        strongHire: "Principal-level mastery: world-class systems depth in distributed consensus, zero-downtime data migration, and high-scale event streaming.",
+        noHire: "Score 0.0 - 2.5: Lacks distributed systems foundations; unable to explain partition tolerance or handle service failure cascades.",
+        leanNoHire: "Score 2.6 - 4.5: Good component-level knowledge but struggles when challenged on distributed data consistency anomalies or partition splits.",
+        hire: "Score 4.6 - 6.5: Senior backend leader: masterfully architects distributed services, prevents split-brain, implements graceful degradation under extreme load.",
+        strongHire: "Score 6.6 - 10.0: Principal-level mastery: world-class systems depth in distributed consensus, zero-downtime data migration, and high-scale event streaming.",
       },
       greenFlags: [
         "Designs backpressure mechanisms (leaky bucket, token bucket) and load shedding",
@@ -193,24 +196,24 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "Assuming synchronous distributed transactions (2PC) are feasible at high scale",
         "Ignoring network partition failures or thundering herd scenarios",
       ],
-      adaptiveNotes: "Challenge with realistic edge cases (split-brain, clock drift, connection exhaustion) and evaluate architectural maturity.",
+      adaptiveNotes: "Challenge with realistic edge cases and evaluate architectural maturity.",
     },
   },
 
   FRONTEND: {
     JUNIOR: {
       trackName: "Frontend Engineering",
-      rolePersona: "Senior Frontend Lead evaluating an Entry-Level Frontend Engineer (0-2 years)",
+      rolePersona: "Strict Senior Frontend Lead evaluating an Entry-Level Frontend Engineer (0-2 years)",
       focusDomain: "Component hierarchy, React state and props, DOM events, CSS layout (Flexbox/Grid), and async API fetching.",
       categoryDefinitions: `1. **Technical Accuracy**: Correct usage of useState, useEffect dependencies, conditional rendering, and semantic HTML.
 2. **Problem Solving**: Handling loading and error states, form input controlled state, and basic responsiveness.
 3. **Communication**: Clear explanation of component composition and user interactions.
 4. **Engineering Depth**: Understanding the difference between client-side state, props drilling, and basic Web Accessibility (WCAG).`,
       scoreBands: {
-        noHire: "Cannot explain basic component props/state flow, causes infinite render loops with useEffect, or ignores CSS basics.",
-        leanNoHire: "Knows React syntax but cannot explain how DOM events work or how to handle asynchronous fetch states cleanly.",
-        hire: "Solid junior engineer: builds modular UI components, manages local state cleanly, handles network loading/error states.",
-        strongHire: "Exceptional junior: understands memoization basics, clean custom hooks, and semantic accessibility.",
+        noHire: "Score 0.0 - 2.5: Cannot explain basic component props/state flow, causes infinite render loops with useEffect, or ignores CSS basics.",
+        leanNoHire: "Score 2.6 - 4.5: Knows React syntax but cannot explain how DOM events work or how to handle asynchronous fetch states cleanly.",
+        hire: "Score 4.6 - 6.5: Solid junior engineer: builds modular UI components, manages local state cleanly, handles network loading/error states independently.",
+        strongHire: "Score 6.6 - 10.0: Exceptional junior: understands memoization basics, clean custom hooks, and semantic accessibility.",
       },
       greenFlags: [
         "Correctly manages useEffect dependency arrays without missing dependencies",
@@ -227,15 +230,15 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       trackName: "Frontend Engineering",
       rolePersona: "Staff Frontend Architect evaluating a Mid-Level Frontend Engineer (2-5 years)",
       focusDomain: "Component design systems, state management architecture, rendering performance, client-side caching, and Core Web Vitals.",
-      categoryDefinitions: `1. **Technical Accuracy**: Deep knowledge of Virtual DOM reconciliation, memoization (useMemo, useCallback), React Query/SWR, and browser rendering pipeline.
+      categoryDefinitions: `1. **Technical Accuracy**: Deep knowledge of Virtual DOM reconciliation, memoization, React Query/SWR, and browser rendering pipeline.
 2. **Problem Solving**: Eliminating unnecessary re-renders, optimizing bundle sizes with lazy loading, and managing complex global state.
-3. **Communication**: Articulating trade-offs between client-side state libraries (Zustand, Redux, Context) and data-fetching cache layers.
+3. **Communication**: Articulating trade-offs between client-side state libraries and data-fetching cache layers.
 4. **Engineering Depth**: Understanding Core Web Vitals (LCP, INP, CLS), browser critical rendering path, and XSS prevention.`,
       scoreBands: {
-        noHire: "Unable to diagnose performance bottlenecks or explain why components re-render.",
-        leanNoHire: "Applies useMemo/useCallback blindly without profiling; struggles with cache synchronization or stale state bugs.",
-        hire: "Strong mid-level frontend engineer: structures clean design systems, optimizes rendering performance, leverages modern query caches.",
-        strongHire: "Near-senior expertise: masterfully optimizes Web Vitals, implements optimistic UI rollbacks, and structures complex state machines.",
+        noHire: "Score 0.0 - 2.5: Unable to diagnose performance bottlenecks or explain why components re-render.",
+        leanNoHire: "Score 2.6 - 4.5: Applies useMemo/useCallback blindly without profiling; struggles with cache synchronization or stale state bugs.",
+        hire: "Score 4.6 - 6.5: Strong mid-level frontend engineer: structures clean design systems, optimizes rendering performance, leverages modern query caches.",
+        strongHire: "Score 6.6 - 10.0: Near-senior expertise: masterfully optimizes Web Vitals, implements optimistic UI rollbacks, and structures complex state machines.",
       },
       greenFlags: [
         "Profiles performance with React DevTools and Chrome Performance tab",
@@ -254,13 +257,13 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       focusDomain: "Enterprise frontend architecture, streaming SSR, Micro-frontends, build tooling, and web platform standards.",
       categoryDefinitions: `1. **Technical Accuracy**: Masterful understanding of Concurrent React, streaming SSR, hydration internals, Module Federation, and browser paint engines.
 2. **Problem Solving**: Architecting large-scale design systems, resilient offline-first sync, and large bundle optimizations.
-3. **Communication**: High-impact architectural trade-off analysis (SSR vs SSG vs RSC vs SPA), mentoring, and developer experience (DX).
+3. **Communication**: High-impact architectural trade-off analysis (SSR vs SSG vs RSC vs SPA), mentoring, and developer experience.
 4. **Engineering Depth**: Deep mastery of Webpack/Vite/Turbopack internals, Service Workers, memory leak profiling, and WCAG AAA compliance.`,
       scoreBands: {
-        noHire: "Lacks architectural vision for enterprise web apps; unable to explain SSR hydration or modern rendering paradigms.",
-        leanNoHire: "Skilled UI developer but lacks deep understanding of browser engines, streaming SSR, or build tool optimization at scale.",
-        hire: "Senior frontend authority: architects robust, accessible, high-performance web platforms with excellent developer ergonomics.",
-        strongHire: "Principal-level frontend master: pioneer in rendering performance, streaming architecture, offline resilience, and cross-team design systems.",
+        noHire: "Score 0.0 - 2.5: Lacks architectural vision for enterprise web apps; unable to explain SSR hydration or modern rendering paradigms.",
+        leanNoHire: "Score 2.6 - 4.5: Skilled UI developer but lacks deep understanding of browser engines, streaming SSR, or build tool optimization at scale.",
+        hire: "Score 4.6 - 6.5: Senior frontend authority: architects robust, accessible, high-performance web platforms with excellent developer ergonomics.",
+        strongHire: "Score 6.6 - 10.0: Principal-level frontend master: pioneer in rendering performance, streaming architecture, offline resilience, and cross-team design systems.",
       },
       greenFlags: [
         "Deeply explains React Server Components (RSC) and streaming HTML pipelines",
@@ -285,10 +288,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Ability to walk through a high-level block diagram systematically.
 4. **Engineering Depth**: Basic awareness of caching (Redis), database read replicas, and horizontal scaling.`,
       scoreBands: {
-        noHire: "Cannot explain how a client connects to a server, or confuses client-side storage with database servers.",
-        leanNoHire: "Draws boxes on a diagram but cannot explain the function of a load balancer or why a database needs replicas.",
-        hire: "Good junior system understanding: designs a clean 3-tier architecture, explains basic caching, and identifies single points of failure.",
-        strongHire: "Exceeds junior level: calculates basic capacity estimates and reasons clearly about database indexing and caching.",
+        noHire: "Score 0.0 - 2.5: Cannot explain how a client connects to a server, or confuses client-side storage with database servers.",
+        leanNoHire: "Score 2.6 - 4.5: Draws boxes on a diagram but cannot explain the function of a load balancer or why a database needs replicas.",
+        hire: "Score 4.6 - 6.5: Good junior system understanding: designs a clean 3-tier architecture, explains basic caching, and identifies single points of failure.",
+        strongHire: "Score 6.6 - 10.0: Exceeds junior level: calculates basic capacity estimates and reasons clearly about database indexing and caching.",
       },
       greenFlags: [
         "Explains the role of a Load Balancer in distributing web traffic",
@@ -310,10 +313,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Structured approach (Requirements -> Capacity -> High-Level -> Deep Dives -> Bottlenecks).
 4. **Engineering Depth**: Understanding replication lag, consistent hashing, message broker semantics, and database indexing at scale.`,
       scoreBands: {
-        noHire: "Fails to structure the interview; jumps straight into tools without clarifying functional or non-functional requirements.",
-        leanNoHire: "Describes a generic system but cannot perform back-of-the-envelope math or handle database replication lag.",
-        hire: "Strong mid-level architect: produces clear capacity numbers, designs resilient multi-tier topology, addresses cache invalidation.",
-        strongHire: "Near-senior architect: proactively identifies hot key issues, applies consistent hashing, and designs robust asynchronous event flows.",
+        noHire: "Score 0.0 - 2.5: Fails to structure the interview; jumps straight into tools without clarifying functional or non-functional requirements.",
+        leanNoHire: "Score 2.6 - 4.5: Describes a generic system but cannot perform back-of-the-envelope math or handle database replication lag.",
+        hire: "Score 4.6 - 6.5: Strong mid-level architect: produces clear capacity numbers, designs resilient multi-tier topology, addresses cache invalidation.",
+        strongHire: "Score 6.6 - 10.0: Near-senior architect: proactively identifies hot key issues, applies consistent hashing, and designs robust asynchronous event flows.",
       },
       greenFlags: [
         "Starts with clear functional and non-functional requirements (Availability, Latency, Throughput)",
@@ -333,12 +336,12 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       categoryDefinitions: `1. **Technical Accuracy**: Flawless mastery of distributed systems principles (PACELC, Raft/Paxos, CRDTs, WAL, LSM trees vs B-Trees, vectorized search).
 2. **Problem Solving**: Designing for 100M+ DAU, mitigating split-brain, handling global replication lag, and cost optimization.
 3. **Communication**: Flawless executive structure, driving trade-offs proactively, defining SLAs/SLOs, and guiding technical strategy.
-4. **Engineering Depth**: Deep understanding of network protocols (gRPC, TCP, QUIC), kernel bypass, storage engine write amplification, and failure isolation.`,
+4. **Engineering Depth**: Deep understanding of network protocols, kernel bypass, storage engine write amplification, and failure isolation.`,
       scoreBands: {
-        noHire: "Cannot defend architectural choices, ignores failure modes under partition, or shows superficial knowledge.",
-        leanNoHire: "Standard senior knowledge but struggles when pressed on consensus anomalies, multi-region conflict resolution, or extreme edge cases.",
-        hire: "Senior systems authority: designs highly resilient distributed architectures, calculates precise latency budgets, mitigates cascading failures.",
-        strongHire: "Staff/Principal master: world-class distributed architecture, effortless navigation of consensus, cost, partition tolerance, and organizational scale.",
+        noHire: "Score 0.0 - 2.5: Cannot defend architectural choices, ignores failure modes under partition, or shows superficial knowledge.",
+        leanNoHire: "Score 2.6 - 4.5: Standard senior knowledge but struggles when pressed on consensus anomalies, multi-region conflict resolution, or extreme edge cases.",
+        hire: "Score 4.6 - 6.5: Senior systems authority: designs highly resilient distributed architectures, calculates precise latency budgets, mitigates cascading failures.",
+        strongHire: "Score 6.6 - 10.0: Staff/Principal master: world-class distributed architecture, effortless navigation of consensus, cost, partition tolerance, and organizational scale.",
       },
       greenFlags: [
         "Proactively defines blast radius containment, bulkheads, and graceful degradation paths",
@@ -349,24 +352,24 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "Relying on synchronous cross-region database writes for latency-sensitive user paths",
         "Failing to account for clock skew and NTP synchronization limits in distributed ordering",
       ],
-      adaptiveNotes: "Test with severe constraints (e.g. data center outage, network partition, 10x sudden spike) and evaluate resilience.",
+      adaptiveNotes: "Test with severe constraints and evaluate resilience.",
     },
   },
 
   DSA: {
     JUNIOR: {
       trackName: "Data Structures & Algorithms",
-      rolePersona: "Senior Algorithm Specialist evaluating a Junior Developer (0-2 years)",
+      rolePersona: "Strict Senior Algorithm Specialist evaluating an Entry-Level Developer (0-2 years)",
       focusDomain: "Core data structures (Arrays, Strings, Hash Maps, Linked Lists, Stacks, Queues) and fundamental Big-O analysis.",
       categoryDefinitions: `1. **Algorithmic Correctness**: Implements bug-free logic for standard problems (e.g. Two Sum, Valid Parentheses, Reverse Linked List).
 2. **Optimization Ability**: Progresses from naive brute-force (O(N^2)) to optimal hash map or two-pointer approach (O(N)).
-3. **Communication**: Talks through thought process, clarifies constraints (empty input, negative numbers), and writes clean logic.
+3. **Communication**: Talks through thought process, clarifies constraints, and writes clean logic.
 4. **Complexity Analysis**: Accurately computes Big-O time and space complexity.`,
       scoreBands: {
-        noHire: "Unable to write basic iteration logic, confused about array indexing, or cannot compute basic Big-O.",
-        leanNoHire: "Writes brute force but cannot optimize even with hints; struggles with edge cases (empty array, null).",
-        hire: "Good junior algorithmic foundation: clarifies problem constraints, implements correct solution with reasonable complexity, explains Big-O.",
-        strongHire: "Exceptional junior: jumps quickly to optimal data structure, handles edge cases proactively, and proves time/space bounds.",
+        noHire: "Score 0.0 - 2.5: Unable to write basic iteration logic, confused about array indexing, admits not knowing recursion, or cannot compute basic Big-O.",
+        leanNoHire: "Score 2.6 - 4.5: Writes brute force but cannot optimize even with hints; struggles with edge cases (empty array, null).",
+        hire: "Score 4.6 - 6.5: Good junior algorithmic foundation: clarifies problem constraints, implements correct solution with reasonable complexity, explains Big-O.",
+        strongHire: "Score 6.6 - 10.0: Exceptional junior: jumps quickly to optimal data structure, handles edge cases proactively, and proves time/space bounds.",
       },
       greenFlags: [
         "Clarifies input bounds and edge cases before writing code",
@@ -388,10 +391,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Articulates algorithmic patterns clearly and validates solutions with dry-run test cases.
 4. **Complexity Analysis**: Deep understanding of amortized complexity, recursion stack overhead, and auxiliary space.`,
       scoreBands: {
-        noHire: "Struggles with fundamental tree/graph traversals or fails to optimize beyond brute force.",
-        leanNoHire: "Recognizes problem type but gets stuck in implementation details or misses critical edge cases (cycles, integer overflow).",
-        hire: "Strong mid-level problem solver: selects optimal data structure, implements clean solution, explains space/time trade-offs.",
-        strongHire: "Exceptional mastery: rapidly implements optimal DP or Graph solution, proves mathematical invariants, writes clean modular code.",
+        noHire: "Score 0.0 - 2.5: Struggles with fundamental tree/graph traversals or fails to optimize beyond brute force.",
+        leanNoHire: "Score 2.6 - 4.5: Recognizes problem type but gets stuck in implementation details or misses critical edge cases.",
+        hire: "Score 4.6 - 6.5: Strong mid-level problem solver: selects optimal data structure, implements clean solution, explains space/time trade-offs.",
+        strongHire: "Score 6.6 - 10.0: Exceptional mastery: rapidly implements optimal DP or Graph solution, proves mathematical invariants, writes clean modular code.",
       },
       greenFlags: [
         "Selects the optimal algorithmic pattern (e.g. Monotonic Stack, Sliding Window, Topological Sort)",
@@ -411,12 +414,12 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       categoryDefinitions: `1. **Algorithmic Correctness**: Flawless implementation of complex algorithms, optimal data structure selection, and robust edge-case coverage.
 2. **Optimization Ability**: Proves optimality, analyzes amortized bounds, cache locality, and memory overhead.
 3. **Communication**: Crystal-clear explanation of complex state transitions and invariants.
-4. **Complexity Analysis & Production Mapping**: Maps algorithmic principles to real-world software engineering systems (e.g. LRU caches, route planning, rate limiters).`,
+4. **Complexity Analysis & Production Mapping**: Maps algorithmic principles to real-world software engineering systems.`,
       scoreBands: {
-        noHire: "Unable to reason about algorithmic complexity or fails to solve standard medium/hard challenges.",
-        leanNoHire: "Solves standard problems but cannot adapt when constraints are modified (e.g. stream data, memory-constrained).",
-        hire: "Senior algorithmic strength: effortlessly solves hard algorithmic challenges, proves lower bounds, explains cache locality.",
-        strongHire: "Staff/Principal algorithmic master: flawless execution, mathematical proofs of correctness, and maps algorithms to production systems.",
+        noHire: "Score 0.0 - 2.5: Unable to reason about algorithmic complexity or fails to solve standard medium/hard challenges.",
+        leanNoHire: "Score 2.6 - 4.5: Solves standard problems but cannot adapt when constraints are modified.",
+        hire: "Score 4.6 - 6.5: Senior algorithmic strength: effortlessly solves hard algorithmic challenges, proves lower bounds, explains cache locality.",
+        strongHire: "Score 6.6 - 10.0: Staff/Principal algorithmic master: flawless execution, mathematical proofs of correctness, and maps algorithms to production systems.",
       },
       greenFlags: [
         "Analyzes CPU cache locality, branch prediction, and memory layout of data structures",
@@ -441,10 +444,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Impact Articulation**: Shares concrete outcomes, lessons learned, and continuous improvement trajectory.
 4. **Leadership & Culture**: Openness to constructive code review feedback, team camaraderie, and growth mindset.`,
       scoreBands: {
-        noHire: "Blames others for failures, defensive about code review feedback, or unable to describe a single real project experience.",
-        leanNoHire: "Gives vague, generic answers ('I worked hard') without concrete actions or personal ownership.",
-        hire: "Great junior teammate: tells structured STAR stories, shows humility and eagerness to learn, receives feedback constructively.",
-        strongHire: "Exceptional junior: shows remarkable self-awareness, took initiative to improve documentation/tests, inspired peers.",
+        noHire: "Score 0.0 - 2.5: Blames others for failures, defensive about code review feedback, or unable to describe a single real project experience.",
+        leanNoHire: "Score 2.6 - 4.5: Gives vague, generic answers ('I worked hard') without concrete actions or personal ownership.",
+        hire: "Score 4.6 - 6.5: Great junior teammate: tells structured STAR stories, shows humility and eagerness to learn, receives feedback constructively.",
+        strongHire: "Score 6.6 - 10.0: Exceptional junior: shows remarkable self-awareness, took initiative to improve documentation/tests, inspired peers.",
       },
       greenFlags: [
         "Openly shares a mistake they made, what they learned, and how they fixed it",
@@ -463,13 +466,13 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       focusDomain: "Feature ownership, cross-functional collaboration (PM/Design), resolving disagreements, and accountability.",
       categoryDefinitions: `1. **Situation Framing**: Clear, high-context STAR framing of real production features and technical hurdles.
 2. **Action Quality**: Decisive technical actions taken, pushing back constructively on requirements, and driving project completion.
-3. **Impact Articulation**: Quantifiable business and technical metrics (e.g. reduced latency by 30%, shipped feature on deadline).
+3. **Impact Articulation**: Quantifiable business and technical metrics.
 4. **Leadership & Culture**: Mentoring junior engineers, mediating disagreements in design reviews, and fostering healthy engineering practices.`,
       scoreBands: {
-        noHire: "Cannot articulate personal contribution to team success; avoids accountability for past project delays.",
-        leanNoHire: "Struggles to describe cross-functional collaboration with product or design; gives superficial answers.",
-        hire: "Strong mid-level engineer: demonstrates end-to-end feature ownership, resolves technical disagreements professionally, quantifies impact.",
-        strongHire: "Near-senior leadership: proactively improved team processes, mentored juniors to promotion, navigated ambiguous requirements.",
+        noHire: "Score 0.0 - 2.5: Cannot articulate personal contribution to team success; avoids accountability for past project delays.",
+        leanNoHire: "Score 2.6 - 4.5: Struggles to describe cross-functional collaboration with product or design; gives superficial answers.",
+        hire: "Score 4.6 - 6.5: Strong mid-level engineer: demonstrates end-to-end feature ownership, resolves technical disagreements professionally, quantifies impact.",
+        strongHire: "Score 6.6 - 10.0: Near-senior leadership: proactively improved team processes, mentored juniors to promotion, navigated ambiguous requirements.",
       },
       greenFlags: [
         "Describes navigating shifting requirements with product managers constructively",
@@ -491,10 +494,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Impact Articulation**: Broad organizational impact (revenue, system uptime, team velocity, retention).
 4. **Leadership & Culture**: Resolving deep technical rifts between staff engineers, leading blameless post-mortems, and elevating engineering standards.`,
       scoreBands: {
-        noHire: "Lacks executive presence; unable to influence peers or resolve team conflict without escalation.",
-        leanNoHire: "Strong technical individual contributor but lacks strategic organizational influence or empathy for broader business goals.",
-        hire: "Senior engineering leader: drives multi-team technical alignment, leads blameless outage post-mortems, mentors and multiplies others.",
-        strongHire: "Staff+ / VP caliber: exceptional leadership presence, builds enduring engineering culture, resolves deep org friction, aligns tech with business.",
+        noHire: "Score 0.0 - 2.5: Lacks executive presence; unable to influence peers or resolve team conflict without escalation.",
+        leanNoHire: "Score 2.6 - 4.5: Strong technical individual contributor but lacks strategic organizational influence or empathy for broader business goals.",
+        hire: "Score 4.6 - 6.5: Senior engineering leader: drives multi-team technical alignment, leads blameless outage post-mortems, mentors and multiplies others.",
+        strongHire: "Score 6.6 - 10.0: Staff+ / VP caliber: exceptional leadership presence, builds enduring engineering culture, resolves deep org friction, aligns tech with business.",
       },
       greenFlags: [
         "Leads blameless post-mortems focusing on systemic safeguards rather than human error",
@@ -512,17 +515,17 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
   DEVOPS_CLOUD: {
     JUNIOR: {
       trackName: "DevOps & Cloud",
-      rolePersona: "Senior Platform Lead evaluating a Junior DevOps / Cloud Engineer (0-2 years)",
+      rolePersona: "Strict Senior Platform Lead evaluating an Entry-Level DevOps / Cloud Engineer (0-2 years)",
       focusDomain: "CI/CD pipelines, Docker containerization, basic Linux commands, cloud basics (AWS/GCP), and application logging.",
-      categoryDefinitions: `1. **Technical Accuracy**: Writing valid Dockerfiles, understanding CI/CD triggers, basic Linux permissions, and cloud resources (EC2, S3).
+      categoryDefinitions: `1. **Technical Accuracy**: Writing valid Dockerfiles, understanding CI/CD triggers, basic Linux permissions, and cloud resources.
 2. **Problem Solving**: Debugging failed build pipelines, container port mapping issues, and basic network connectivity.
 3. **Communication**: Clear explanation of how code moves from a git commit to a deployed cloud server.
 4. **Engineering Depth**: Basic awareness of environment secrets, SSL/TLS certificates, and log inspection.`,
       scoreBands: {
-        noHire: "Cannot write a basic Dockerfile or explain how a CI/CD pipeline operates.",
-        leanNoHire: "Knows basic commands but doesn't understand container layers, environment variables, or port bindings.",
-        hire: "Competent junior DevOps engineer: writes multi-stage Dockerfiles, builds GitHub Actions pipelines, inspects container logs.",
-        strongHire: "Exceptional junior: understands basic Terraform (IaC), container security scanning, and Prometheus metrics.",
+        noHire: "Score 0.0 - 2.5: Cannot write a basic Dockerfile, fails to explain how a CI/CD pipeline operates, or gives nonsensical answers.",
+        leanNoHire: "Score 2.6 - 4.5: Knows basic commands but doesn't understand container layers, environment variables, or port bindings.",
+        hire: "Score 4.6 - 6.5: Competent junior DevOps engineer: writes multi-stage Dockerfiles, builds GitHub Actions pipelines, inspects container logs.",
+        strongHire: "Score 6.6 - 10.0: Exceptional junior: understands basic Terraform (IaC), container security scanning, and Prometheus metrics.",
       },
       greenFlags: [
         "Uses multi-stage Docker builds to keep production images lightweight",
@@ -538,41 +541,41 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
     MID: {
       trackName: "DevOps & Cloud",
       rolePersona: "Staff Site Reliability Engineer evaluating a Mid-Level DevOps / SRE Engineer (2-5 years)",
-      focusDomain: "Kubernetes orchestration, Infrastructure as Code (Terraform), observability (Prometheus/Grafana), and deployment strategies.",
-      categoryDefinitions: `1. **Technical Accuracy**: Deep knowledge of Kubernetes resources (Deployments, Services, Ingress, HPA), Terraform state management, and IAM policies.
+      focusDomain: "Kubernetes orchestration, Infrastructure as Code (Terraform), observability, and deployment strategies.",
+      categoryDefinitions: `1. **Technical Accuracy**: Deep knowledge of Kubernetes resources, Terraform state management, and IAM policies.
 2. **Problem Solving**: Designing zero-downtime Blue-Green/Canary deployments, resolving crash loops, and setting actionable alerting thresholds.
-3. **Communication**: Articulating cloud architecture trade-offs (Serverless vs Containers, Managed DB vs Self-Hosted).
+3. **Communication**: Articulating cloud architecture trade-offs.
 4. **Engineering Depth**: Understanding distributed tracing (OpenTelemetry), log aggregation at scale, and least-privilege cloud security.`,
       scoreBands: {
-        noHire: "Cannot explain Kubernetes networking or fails to manage Terraform state safely.",
-        leanNoHire: "Uses Kubernetes manifests blindly without understanding resource limits, probes, or autoscaling behavior.",
-        hire: "Solid mid-level SRE/DevOps engineer: manages production K8s clusters, writes modular Terraform, implements actionable alerting.",
-        strongHire: "Near-senior platform engineer: implements GitOps with ArgoCD, establishes golden observability pipelines, mitigates incident blast radius.",
+        noHire: "Score 0.0 - 2.5: Cannot explain Kubernetes networking or fails to manage Terraform state safely.",
+        leanNoHire: "Score 2.6 - 4.5: Uses Kubernetes manifests blindly without understanding resource limits, probes, or autoscaling behavior.",
+        hire: "Score 4.6 - 6.5: Solid mid-level SRE/DevOps engineer: manages production K8s clusters, writes modular Terraform, implements actionable alerting.",
+        strongHire: "Score 6.6 - 10.0: Near-senior platform engineer: implements GitOps with ArgoCD, establishes golden observability pipelines, mitigates incident blast radius.",
       },
       greenFlags: [
         "Configures proper Kubernetes liveness, readiness, and startup probes",
         "Defines resource requests and limits to prevent noisy-neighbor cluster evictions",
-        "Implements modular Terraform with remote state locking (S3 + DynamoDB)",
+        "Implements modular Terraform with remote state locking",
       ],
       redFlags: [
         "Deploying Kubernetes pods without resource limits or health probes",
-        "Creating overly permissive cloud IAM policies (e.g. AdministratorAccess or *:* permissions)",
+        "Creating overly permissive cloud IAM policies",
       ],
       adaptiveNotes: "Evaluate infrastructure resilience, automation, and observability depth.",
     },
     SENIOR: {
       trackName: "DevOps & Cloud",
       rolePersona: "Principal Platform Architect evaluating a Senior / Staff SRE / Platform Engineer (5+ years)",
-      focusDomain: "Enterprise platform engineering, service mesh (Istio/Linkerd), multi-cluster GitOps, FinOps, and automated chaos engineering.",
+      focusDomain: "Enterprise platform engineering, service mesh, multi-cluster GitOps, FinOps, and automated chaos engineering.",
       categoryDefinitions: `1. **Technical Accuracy**: Masterful understanding of eBPF, service mesh mTLS, BGP routing, multi-region disaster recovery (RTO/RPO), and Vault architecture.
 2. **Problem Solving**: Multi-region failover, mitigating cloud provider zone outages, automated chaos testing, and large-scale cloud cost governance.
 3. **Communication**: Strategic engineering leadership, defining error budgets and SLOs with executive product stakeholders.
-4. **Engineering Depth**: Deep mastery of Linux kernel networking, container runtime security, high-cardinality metric indexing, and infrastructure compliance.`,
+4. **Engineering Depth**: Deep mastery of Linux kernel networking, container runtime security, and infrastructure compliance.`,
       scoreBands: {
-        noHire: "Lacks platform architecture vision; unable to design multi-region disaster recovery or manage cluster security.",
-        leanNoHire: "Good operational skills but struggles when pressed on service mesh networking, FinOps cost modeling, or chaos testing at scale.",
-        hire: "Senior platform leader: designs enterprise-grade multi-cluster platforms, enforces zero-trust security, operationalizes SLO error budgets.",
-        strongHire: "Principal platform master: industry-defining platform architecture, eBPF observability, automated self-healing infrastructure, and FinOps excellence.",
+        noHire: "Score 0.0 - 2.5: Lacks platform architecture vision; unable to design multi-region disaster recovery or manage cluster security.",
+        leanNoHire: "Score 2.6 - 4.5: Good operational skills but struggles when pressed on service mesh networking, FinOps cost modeling, or chaos testing at scale.",
+        hire: "Score 4.6 - 6.5: Senior platform leader: designs enterprise-grade multi-cluster platforms, enforces zero-trust security, operationalizes SLO error budgets.",
+        strongHire: "Score 6.6 - 10.0: Principal platform master: industry-defining platform architecture, eBPF observability, automated self-healing infrastructure, and FinOps excellence.",
       },
       greenFlags: [
         "Establishes precise SLO/SLI error budget policies that govern release velocity",
@@ -583,24 +586,24 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "No disaster recovery strategy for cross-region database or cluster failures",
         "Ignoring cloud egress bandwidth costs and idle infrastructure spend",
       ],
-      adaptiveNotes: "Test with large-scale failure scenarios (region loss, certificate expiry, cascading DDOS) and evaluate leadership.",
+      adaptiveNotes: "Test with large-scale failure scenarios and evaluate leadership.",
     },
   },
 
   ML_AI: {
     JUNIOR: {
       trackName: "ML & AI Engineering",
-      rolePersona: "Senior AI Researcher evaluating an Entry-Level ML / AI Engineer (0-2 years)",
+      rolePersona: "Strict Senior AI Researcher evaluating an Entry-Level ML / AI Engineer (0-2 years)",
       focusDomain: "Data preprocessing, train/val/test splits, classic ML metrics (Precision/Recall/F1), basic RAG, and model evaluation.",
-      categoryDefinitions: `1. **Technical Accuracy**: Correct understanding of supervised vs unsupervised learning, overfitting/underfitting, embeddings, and loss functions.
+      categoryDefinitions: `1. **Technical Accuracy**: Correct understanding of supervised vs unsupervised learning, overfitting/underfitting, embeddings, and metric trade-offs.
 2. **Problem Solving**: Handling missing data, class imbalance (SMOTE/class weights), and basic prompt engineering with context injection.
-3. **Communication**: Explaining model evaluation results and metric trade-offs clearly.
+3. **Communication**: Explaining model evaluation results and metric trade-offs clearly without confusing Python ML with JavaScript frameworks.
 4. **Engineering Depth**: Basic understanding of vector databases, token limits, and serving models with FastAPI/Flask.`,
       scoreBands: {
-        noHire: "Cannot explain basic ML concepts (e.g. data leakage, precision vs recall) or confused about embeddings.",
-        leanNoHire: "Knows library syntax (scikit-learn, PyTorch) but doesn't understand why a model is overfitting or how to evaluate it.",
-        hire: "Solid junior ML engineer: cleans data properly, selects correct evaluation metrics, builds simple RAG pipelines, serves predictions via API.",
-        strongHire: "Exceptional junior: understands chunking trade-offs in RAG, fine-tuning basics (LoRA), and implements automated evaluation metrics.",
+        noHire: "Score 0.0 - 2.5: Cannot explain basic ML concepts (e.g. data leakage, precision vs recall vs accuracy), uses nonsensical terms (e.g. 'cloning for outliers'), relies on interviewer spoon-feeding, or confuses frontend JS frameworks with Python ML.",
+        leanNoHire: "Score 2.6 - 4.5: Recites basic definitions but cannot explain why accuracy fails under class imbalance, confuses validation vs test splits, or cannot describe RAG mechanisms without prompting.",
+        hire: "Score 4.6 - 6.5: Solid junior ML engineer: independently explains data cleaning, understands metric trade-offs, articulates vector embeddings and RAG concepts clearly.",
+        strongHire: "Score 6.6 - 10.0: Exceptional junior: understands chunking trade-offs in RAG, fine-tuning basics (LoRA), and implements automated evaluation metrics.",
       },
       greenFlags: [
         "Correctly identifies and prevents data leakage across train/test splits",
@@ -609,9 +612,11 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       ],
       redFlags: [
         "Evaluating a classification model with severe class imbalance using only Accuracy",
-        "Training on test data or scaling features before splitting datasets",
+        "Using fabricated or nonsensical terms (e.g. 'cloning for outliers')",
+        "Relying on the interviewer to explain validation sets or introduce RAG first",
+        "Listing frontend JavaScript frameworks for Python ML inference servers",
       ],
-      adaptiveNotes: "Focus on clean data practices, metric comprehension, and foundational LLM/embedding workflows.",
+      adaptiveNotes: "Hold the candidate to genuine ML engineering standards. Do not award points for agreeing with interviewer suggestions.",
     },
     MID: {
       trackName: "ML & AI Engineering",
@@ -622,10 +627,10 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
 3. **Communication**: Articulating trade-offs between fine-tuning vs RAG, small specialized models vs large frontier LLMs.
 4. **Engineering Depth**: Understanding GPU memory allocation (VRAM), batching strategies (vLLM continuous batching), and LLM-as-a-judge evaluation frameworks.`,
       scoreBands: {
-        noHire: "Treats LLMs as a magic black box without understanding retrieval bottlenecks, latency constraints, or evaluation metrics.",
-        leanNoHire: "Builds standard RAG but cannot handle retrieval failures, hallucinations, context fragmentation, or high serving costs.",
-        hire: "Strong mid-level AI engineer: implements advanced RAG (re-ranking, hybrid search), optimizes inference latency, tracks model drift in production.",
-        strongHire: "Near-senior AI architect: designs multi-agent orchestration, implements automated hallucination guardrails, fine-tunes open models with LoRA/QLoRA.",
+        noHire: "Score 0.0 - 2.5: Treats LLMs as a magic black box without understanding retrieval bottlenecks, latency constraints, or evaluation metrics.",
+        leanNoHire: "Score 2.6 - 4.5: Builds standard RAG but cannot handle retrieval failures, hallucinations, context fragmentation, or high serving costs.",
+        hire: "Score 4.6 - 6.5: Strong mid-level AI engineer: implements advanced RAG (re-ranking, hybrid search), optimizes inference latency, tracks model drift in production.",
+        strongHire: "Score 6.6 - 10.0: Near-senior AI architect: designs multi-agent orchestration, implements automated hallucination guardrails, fine-tunes open models with LoRA/QLoRA.",
       },
       greenFlags: [
         "Implements hybrid search (Dense embeddings + Sparse BM25) with cross-encoder re-ranking",
@@ -645,12 +650,12 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
       categoryDefinitions: `1. **Technical Accuracy**: Masterful understanding of attention mechanics (FlashAttention), parameter-efficient fine-tuning (LoRA, QLoRA, DPO), KV-cache optimization, and semantic caching.
 2. **Problem Solving**: Multi-step autonomous agent architectures, reliable tool-calling guardrails, self-healing workflows, and scaling vector search to billions of embeddings.
 3. **Communication**: Strategic AI roadmapping, ROI analysis (build vs buy, open-weight vs proprietary API), and AI ethics/security leadership.
-4. **Engineering Depth**: Deep mastery of GPU cluster orchestration (CUDA, Triton), model quantization degradation bounds, and adversarial prompt injection defenses.`,
+4. **Engineering Depth**: Deep mastery of GPU cluster orchestration, model quantization degradation bounds, and adversarial prompt injection defenses.`,
       scoreBands: {
-        noHire: "Lacks systems-level AI depth; unable to optimize serving throughput, prevent agent looping, or govern model drift at scale.",
-        leanNoHire: "Good theoretical knowledge but lacks hands-on production experience in high-concurrency LLM serving, agent reliability, or fine-tuning economics.",
-        hire: "Senior AI systems leader: masterfully architects reliable LLM agent pipelines, optimizes high-throughput model serving, enforces enterprise guardrails.",
-        strongHire: "Principal AI master: world-class expertise in distributed AI systems, custom model distillation, cutting-edge retrieval topologies, and AI governance.",
+        noHire: "Score 0.0 - 2.5: Lacks systems-level AI depth; unable to optimize serving throughput, prevent agent looping, or govern model drift at scale.",
+        leanNoHire: "Score 2.6 - 4.5: Good theoretical knowledge but lacks hands-on production experience in high-concurrency LLM serving, agent reliability, or fine-tuning economics.",
+        hire: "Score 4.6 - 6.5: Senior AI systems leader: masterfully architects reliable LLM agent pipelines, optimizes high-throughput model serving, enforces enterprise guardrails.",
+        strongHire: "Score 6.6 - 10.0: Principal AI master: world-class expertise in distributed AI systems, custom model distillation, cutting-edge retrieval topologies, and AI governance.",
       },
       greenFlags: [
         "Designs autonomous agent loops with deterministic state machines and loop-break guardrails",
@@ -661,7 +666,7 @@ const RUBRIC_MATRIX: Record<string, Record<ExperienceLevel, TrackLevelRubric>> =
         "Allowing autonomous LLM agents to execute destructive actions without human-in-the-loop or sandboxing",
         "Assuming proprietary frontier APIs are the only solution without evaluating distilled open-weight models for cost/speed",
       ],
-      adaptiveNotes: "Hold the candidate to cutting-edge 2025 AI engineering rigor: agent reliability, KV-cache serving, and security guardrails.",
+      adaptiveNotes: "Hold the candidate to cutting-edge AI engineering rigor: agent reliability, KV-cache serving, and security guardrails.",
     },
   },
 };
@@ -690,23 +695,30 @@ ${githubMetadata ? (typeof githubMetadata === "string" ? githubMetadata : JSON.s
 ### INTERVIEW TRANSCRIPT:
 ${transcriptFormatted}
 
-### STANDARDIZED SCORING CALIBRATION RUBRIC (${experienceLevel} Baseline):
-- **0.0 - 3.9 (No Hire)**: ${rubric.scoreBands.noHire}
-- **4.0 - 5.9 (Lean No Hire)**: ${rubric.scoreBands.leanNoHire}
-- **6.0 - 7.9 (Hire - ${experienceLevel} Expectations Met)**: ${rubric.scoreBands.hire}
-- **8.0 - 10.0 (Strong Hire - Exceptional ${experienceLevel})**: ${rubric.scoreBands.strongHire}
+### CRITICAL EVALUATION RULES (ZERO TOLERANCE FOR FALSE COMPETENCY):
+1. **ANTI-SPOONFEEDING & CANDIDATE-INITIATED DEPTH CHECK**:
+   - Carefully examine WHO introduced technical concepts in the transcript.
+   - If the INTERVIEWER supplied the definition, named the pattern/tool first (e.g. Alex mentioned RAG, Alex explained train/val split, Alex suggested Redis), or completed the candidate's sentence, the candidate MUST receive **ZERO credit** for that topic.
+   - Do NOT credit a candidate for merely agreeing ("Yes, right", "You told me yourself") with interviewer suggestions.
+2. **NONSENSE & FABRICATED TERMINOLOGY PENALTIES**:
+   - Actively penalize nonsensical terms (e.g. "cloning for outliers", confusing frontend JS frameworks with Python ML serving, "not knowing recursion"), trailing off sentences, or audio test placeholders ("ABCD123456789").
+   - Heavily dock Technical Accuracy and Depth down into the **1.0 - 2.5** range.
+3. **ZERO PARTICIPATION PRAISE / AUTHENTIC STRENGTHS ONLY**:
+   - Do NOT invent positive strengths for answering baseline elementary definitions (e.g. reciting standard Big-O or mentioning mean replacement is NOT a senior strength).
+   - "strengths" must contain between 0 and 3 items.
+   - If the candidate failed the interview or exhibited fundamental gaps, return an empty array \`[]\` or explicitly state \`["No substantial engineering strengths demonstrated at the declared ${experienceLevel} bar."]\`.
+4. **UNCOMPROMISING TIER-1 SCORING CALIBRATION (${experienceLevel} Baseline)**:
+   - **0.0 - 2.5 (Clear No Hire)**: ${rubric.scoreBands.noHire}
+   - **2.6 - 4.5 (Lean No Hire)**: ${rubric.scoreBands.leanNoHire}
+   - **4.6 - 6.5 (Lean Hire - Baseline Met)**: ${rubric.scoreBands.hire}
+   - **6.6 - 8.5 (Hire - Strong Production Quality)**: ${rubric.scoreBands.strongHire}
+   - **8.6 - 10.0 (Strong Hire - Exceptional Mastery)**: Exceeds all expectations across every probed domain.
 
 ### LOOK-FORS & GREEN FLAGS (Positive Signals for High Scores):
 ${rubric.greenFlags.map((flag) => `- [POSITIVE]: ${flag}`).join("\n")}
 
 ### PITFALLS & RED FLAGS (Negative Signals for Low Scores):
 ${rubric.redFlags.map((flag) => `- [NEGATIVE]: ${flag}`).join("\n")}
-
-### ADAPTIVE SCORING & CALIBRATION PROTOCOL:
-1. **Anchor on Declared Level**: Evaluate the candidate's baseline against the ${experienceLevel} rubric.
-2. **Reward Successful Stretch**: If the interviewer probed upward into harder questions and the candidate handled them well, award a higher score (8.0+) and explicitly praise this in the summary.
-3. **Fairness on Stretch Questions**: ${rubric.adaptiveNotes}
-4. **Observed vs Declared Calibration**: In the summary, state the candidate's observed capability level clearly (e.g., "Declared: ${experienceLevel} | Observed: Strong Mid-level capability").
 
 ### 4 EVALUATION CATEGORIES & DEFINITIONS:
 ${rubric.categoryDefinitions}
@@ -724,24 +736,19 @@ ${isDSA ? `NOTE: For DSA track, the output JSON category keys map as:
 - depth -> Complexity Analysis & Memory Bounds score and feedback` : ""}
 
 ### STRICT OUTPUT QUALITY & DEPTH REQUIREMENTS:
-1. **No One-Line Shortcuts**: Every text field must contain rich, multi-sentence technical analysis. Never return a single generic sentence.
-2. **summary (3–4 full sentences)**:
-   - Sentence 1: Executive overview of the candidate's technical breadth and primary focus areas during the interview.
-   - Sentence 2: Quality of problem-solving instincts, system trade-offs, and failure mode analysis.
-   - Sentence 3: Explicit calibration sentence: "Declared: ${experienceLevel} | Observed: [Junior / Mid-Level / Senior / Staff-leaning] capability."
+1. **summary (3–4 full sentences)**:
+   - Sentence 1: Executive overview of candidate performance, independence, and technical depth.
+   - Sentence 2: Specific assessment of problem-solving rigor and whether answers were candidate-initiated vs interviewer-spoonfed.
+   - Sentence 3: Explicit level calibration: "Declared: ${experienceLevel} | Observed: [Junior / Mid-Level / Senior / Unsatisfactory] capability."
    - Sentence 4: Clear hiring justification aligning with the final recommendation.
-3. **categories.*.feedback (2–3 full sentences per category, ~60–90 words)**:
-   - Must be a complete, structured paragraph for EVERY category.
-   - Sentence 1: Concrete technical concepts, APIs, protocols, or data structures demonstrated by the candidate in this category.
-   - Sentence 2: Specific evaluation of how effectively trade-offs, edge cases, and constraints were reasoned through.
-   - Sentence 3: Constructive feedback noting either exceptional mastery or the specific nuance required for higher-tier calibration.
-4. **strengths (3 to 5 comprehensive items)**:
-   - Each item must be a detailed, specific sentence naming the exact architectural choice, algorithm, or pattern used (e.g. "Implemented resilient backpressure via Redis atomic Lua scripts...").
-5. **improvements (3 to 4 actionable, growth-oriented items)**:
-   - Each item must be 1–2 complete sentences highlighting a technical gap AND explicitly recommending the exact concept, RFC, algorithm, or production pattern to study (e.g. "Study Redis XAUTOCLAIM and Pending Entries List (PEL) inspection for handling consumer worker crashes...").
-6. **evidence (3 to 5 verbatim quotes)**:
-   - Extract 3 to 5 distinct verbatim candidate quotes from different phases of the interview.
-   - Each quote MUST have a 2-sentence technical assessment analyzing what engineering signal the quote provides.
+2. **categories.*.feedback (2–3 full sentences per category, ~50–80 words)**:
+   - Must be a structured paragraph for EVERY category analyzing unprompted technical depth, inaccuracies, and precision.
+3. **strengths (0 to 3 authentic items)**:
+   - Empty \`[]\` or honest assessment if performance failed to meet the declared bar.
+4. **improvements (2 to 4 actionable items)**:
+   - Concrete technical gaps and specific production patterns, algorithms, or RFCs to study.
+5. **evidence (2 to 4 verbatim quotes)**:
+   - Verbatim quotes from the transcript with a 2-sentence technical assessment analyzing the demonstrated signal or failure mode.
 
 ### STRICT JSON SCHEMA:
 Respond with ONLY a valid, parseable JSON object matching this schema without markdown fences outside the JSON:
@@ -768,27 +775,16 @@ Respond with ONLY a valid, parseable JSON object matching this schema without ma
     }
   },
   "strengths": [
-    "string (Detailed 1-2 sentence strength with specific architectural or algorithmic citations)",
-    "string (Second key technical strength)",
-    "string (Third key technical strength)"
+    "string (Authentic strength, or empty if performance was below bar)"
   ],
   "improvements": [
     "string (Detailed 1-2 sentence actionable improvement area with specific tools/patterns to study)",
-    "string (Second actionable improvement area)",
-    "string (Third actionable improvement area)"
+    "string (Second actionable improvement area)"
   ],
   "evidence": [
     {
       "quote": "string (verbatim candidate quote from transcript)",
       "assessment": "string (2-sentence sharp technical assessment of why this quote demonstrates mastery or a specific gap)"
-    },
-    {
-      "quote": "string (second verbatim candidate quote)",
-      "assessment": "string (2-sentence technical assessment)"
-    },
-    {
-      "quote": "string (third verbatim candidate quote)",
-      "assessment": "string (2-sentence technical assessment)"
     }
   ]
 }`;

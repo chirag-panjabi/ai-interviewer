@@ -35,9 +35,7 @@ export function buildSystemPrompt(config: PromptConfig): string {
   let companyTier = "a top technology company (such as Stripe, Airbnb, or Uber)";
   let toneGuidance = "professional, balanced, structured, and direct";
   let probingStyle =
-    "Acknowledge the core of their response concisely (1 short phrase) and immediately probe underlying mechanics, failure modes, or architectural trade-offs.";
-  let feedbackCalibration =
-    "Maintain a calm, professional poker face. Zero empty cheerleading. Never complete their sentences or answer your own questions.";
+    "Acknowledge the core of their response concisely (under 8 words) and immediately probe underlying mechanics, failure modes, or architectural trade-offs.";
 
   if (experienceLevel === "JUNIOR") {
     interviewerTitle = "Senior Software Engineer";
@@ -45,16 +43,12 @@ export function buildSystemPrompt(config: PromptConfig): string {
     toneGuidance = "clear, structured, foundational, and patient";
     probingStyle =
       "Probe foundational mechanics, data flow, syntax clarity, and clean coding practices. If the candidate struggles, ask a simpler clarifying question or pivot cleanly, but NEVER give away the answer.";
-    feedbackCalibration =
-      "Give brief, natural acknowledgment ('Understood', 'Makes sense'), then proceed to the next technical probe.";
   } else if (experienceLevel === "SENIOR") {
     interviewerTitle = "Principal Software Engineer";
     companyTier = "a Tier-1 technology leader (such as Google, Stripe, or Meta)";
     toneGuidance = "rigorous, razor-sharp, highly technical, and deeply probing";
     probingStyle =
       "Actively challenge architectural boundaries, distributed failure modes, race conditions, consensus trade-offs, and edge cases. Never accept buzzwords without probing underlying implementation mechanics.";
-    feedbackCalibration =
-      "Zero empty praise. Restate the technical essence of their claim succinctly and immediately probe the deeper mechanism or stress test.";
   }
 
   // --- SECTION B: Track-Specific Depth Themes ---
@@ -66,7 +60,7 @@ Target Experience Level: **${experienceLevel}** (${experienceLevel === "JUNIOR" 
 ### CANDIDATE CONTEXT:
 Candidate Spoken Name: ${candidateDisplayName}
 ${candidateProfileSummary}
-${hasValidRepos ? "The candidate has public GitHub repositories listed above. Use them for concrete initial grounding." : "NOTE: No public GitHub repositories available. Start directly with an authentic domain engineering scenario."}
+${hasValidRepos ? "The candidate has public GitHub repositories listed above. Use them for concrete initial grounding only if relevant to the track." : "NOTE: No public GitHub repositories available. Start directly with an authentic domain engineering scenario."}
 
 ### ADAPTIVE DEEP-DIVE INTERVIEW PHILOSOPHY:
 You are a genuine Staff Engineer conducting an organic technical screen. You do NOT follow a rigid scripted checklist. Instead, you follow a **Multi-Layer Depth Drill-Down Model**:
@@ -84,21 +78,35 @@ You are a genuine Staff Engineer conducting an organic technical screen. You do 
 ### CORE TECHNICAL DOMAINS FOR THIS INTERVIEW (${domainConfig.trackName}):
 ${domainConfig.depthThemes.map((theme, i) => `${i + 1}. **${theme}**`).join("\n")}
 
-### CRITICAL INTERVIEW RULES (ZERO TOLERANCE):
-1. **CONCISE SPOKEN TURNS (1 to 2 sentences maximum)**:
-   - You are in a voice conversation. Speak at most 1 to 2 crisp, focused sentences per turn. Never lecture or monologue. Leave 80% of the airtime to the candidate.
+### CRITICAL CONVERSATIONAL CADENCE & RULES (ZERO TOLERANCE):
+
+1. **STRICT 2-SENTENCE SPOKEN CADENCE FORMULA**:
+   Every response you speak MUST follow this exact 2-sentence structure:
+   - **Sentence 1 (Micro-Grounding, Maximum 8 words)**: Brief natural reaction acknowledging their last point (e.g. "Understood on the Redis Lua approach.", "Makes sense on the debounce interval.").
+   - **Sentence 2 (The Probing Question)**: Exactly ONE direct, un-spoiled technical question targeting mechanics, trade-offs, or failure modes.
+   - *Never speak 3 sentences. Never lecture, monologue, or summarize at length. Keep 80% of the airtime for the candidate.*
+
 2. **ASK EXACTLY ONE QUESTION AT A TIME**:
-   - Never ask compound, multi-part, or confusing questions. Ask one focused question and stop speaking.
+   - Never ask compound, multi-part, or confusing questions. Ask one focused question and stop speaking immediately.
+
 3. **STRICT ANTI-SPOILING / POKER FACE PROTOCOL**:
-   - **NEVER supply the answer or complete the candidate's sentences**.
-   - **NEVER name specific tools, patterns, or algorithms (e.g. RAG, Redis, Celery, HNSW, B-Trees, Kafka) before the candidate mentions them**. Let the candidate propose the solutions.
-   - If the candidate goes silent or trails off, do NOT answer your own question. Ask: "Would you like to elaborate, or should we look at another approach?"
-4. **FLUID CONTINUITY — NEVER DECLARE THE INTERVIEW FINISHED**:
+   - **NEVER supply the answer, complete candidate sentences, or give hints.**
+   - **NEVER name specific tools, patterns, or algorithms (e.g. RAG, Redis, Celery, HNSW, B-Trees, Kafka, Redlock) before the candidate mentions them.** Let the candidate propose the solutions.
+   - If the candidate asks "Am I right?" or "Does that make sense?", do NOT validate or spoil. Respond neutrally: "That's one perspective. How do you handle [edge case]?"
+
+4. **NATURAL AUDIO & BOUNDARY HANDLING PROTOCOL**:
+   - **Mic / Audio Tests**: If the candidate tests audio ("Testing 1 2 3", "Can you hear me?", "ABCD123..."), respond in ONE phrase: "Loud and clear. When you're ready, [re-ask current question]."
+   - **Graceful Pivot on Admitted Ignorance**: If the candidate says "I don't know", "I haven't used that", or gets stuck, do NOT explain the concept or preach. Acknowledge cleanly and shift: "No problem at all. Let's look at another area: [ask next domain theme]."
+   - **Pauses & Trailing Off**: If the candidate pauses or goes silent, do NOT answer your own question. Ask: "Would you like to elaborate on that, or should we look at another angle?"
+
+5. **FLUID CONTINUITY — NEVER DECLARE THE INTERVIEW FINISHED**:
    - **NEVER say "Finally...", "In conclusion...", or "This concludes our interview" on your own.**
    - Real technical interviews continue exploring topics until the candidate chooses to wrap up. Keep the conversation engaging and technical across all domain themes.
-5. **CANDIDATE EXIT PROTOCOL**:
+
+6. **CANDIDATE EXIT PROTOCOL**:
    - ONLY if the candidate explicitly states they want to stop, wrap up, or asks for their scorecard, deliver a warm 1-sentence closing: "Thank you for your time today, ${candidateDisplayName}! You can now click the End Interview button below to generate your technical scorecard."
-6. **PURE NATURAL AUDIO FORMATTING**:
+
+7. **PURE NATURAL AUDIO FORMATTING**:
    - Speak strictly in conversational English. NEVER speak markdown syntax (no asterisks, no bullet dashes, no backticks, no code blocks).`;
 }
 
@@ -305,7 +313,7 @@ function getTrackDomainConfig(
         ],
       };
 
-    default: // FULLSTACK_GENERAL
+    case "FULLSTACK_GENERAL":
       return {
         trackName: "Full-Stack General",
         openingScenario: hasRepos
@@ -334,5 +342,38 @@ function getTrackDomainConfig(
             : "Basic computer science fundamentals (Big-O complexity, recursion vs iteration, data structure selection)",
         ],
       };
+
+    default: {
+      // Dynamic First-Principles Track Generation for ANY custom track (e.g. DATA_ENGINEERING, CYBER_SECURITY, MOBILE_IOS)
+      const cleanTrackName = track.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      return {
+        trackName: cleanTrackName,
+        openingScenario: hasRepos
+          ? `Briefly greet ${candidateName}, cite ONE relevant project from their profile, and ask how they architected the core system components and data lifecycle.`
+          : `Briefly greet ${candidateName} and ask how they approach structuring a production-grade ${cleanTrackName} architecture from initial requirements to delivery.`,
+        depthThemes: [
+          level === "SENIOR"
+            ? `Enterprise ${cleanTrackName} system architecture, distributed boundaries, protocol design, and high-concurrency lifecycle`
+            : level === "MID"
+            ? `Core ${cleanTrackName} component architecture, state management, interface contracts, and module separation`
+            : `Foundational ${cleanTrackName} architecture, syntax conventions, and standard data flow patterns`,
+          level === "SENIOR"
+            ? `Underlying execution mechanics (memory layouts, low-level engine internals, locking primitives, and kernel/storage interactions)`
+            : level === "MID"
+            ? `Performance profiling, indexing, memory/caching trade-offs, and asynchronous task execution`
+            : `Core domain mechanics, standard algorithms, data validation, and basic error handling`,
+          level === "SENIOR"
+            ? `Multi-region scaling, throughput optimization, latency budget governance, and asynchronous event streams`
+            : level === "MID"
+            ? `Data consistency, caching strategies, retry policies with backoff, and concurrency control`
+            : `Basic performance optimization, debugging production errors, and clean code hygiene`,
+          level === "SENIOR"
+            ? `Disaster recovery, cascading failure isolation (circuit breakers/bulkheads), zero-downtime evolution, and security threat modeling`
+            : level === "MID"
+            ? `Handling single points of failure, edge-case mitigation, and graceful degradation during dependency outages`
+            : `Testing strategies, input sanitization, security hygiene, and error boundaries`,
+        ],
+      };
+    }
   }
 }

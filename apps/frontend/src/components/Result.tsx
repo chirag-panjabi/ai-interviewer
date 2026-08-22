@@ -272,10 +272,10 @@ export function Result() {
               <div className="flex items-center gap-2">
                 <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
-                  EVALUATION DOSSIER
+                  EVALUATION REPORT
                 </span>
-                <span className="text-[11px] font-mono text-muted-foreground tabular-nums">
-                  #{interviewId ? interviewId.slice(-8) : "SESSION"}
+                <span className="rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground tabular-nums">
+                  SESSION #{interviewId ? interviewId.slice(-8) : "REF"}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -315,10 +315,10 @@ export function Result() {
               variant="default"
               size="sm"
               onClick={() => navigate("/")}
-              className="gap-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              className="gap-1.5 rounded-lg text-xs font-semibold cursor-pointer"
             >
               <Plus className="size-3.5" />
-              <span>New Screen</span>
+              <span>New Interview</span>
             </Button>
           </div>
         </header>
@@ -572,11 +572,11 @@ export function Result() {
                     <div className="relative flex items-center">
                       <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
                       <Input
-                        aria-label="Search transcript keywords"
-                        placeholder="Filter dialog..."
+                        aria-label="Search interview transcript by keyword"
+                        placeholder="Search transcript..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-8 w-40 rounded-lg pl-8 text-xs bg-background/60 font-mono"
+                        className="h-8 w-44 rounded-lg pl-8 text-xs bg-background/60 font-mono"
                       />
                     </div>
 

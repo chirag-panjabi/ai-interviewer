@@ -382,7 +382,11 @@ export function Interview() {
             <div className="rounded-xl border border-border/60 bg-background/60 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold flex items-center gap-1.5"><Sliders className="size-3.5 text-primary" /> Audio Diagnostics</span>
-                <button onClick={startMicTest} className="text-xs font-semibold text-primary hover:underline cursor-pointer">
+                <button
+                  type="button"
+                  onClick={isTestingMic ? () => stopMicTest(false) : startMicTest}
+                  className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                >
                   {isTestingMic ? "Stop Testing" : "Test Mic Level"}
                 </button>
               </div>

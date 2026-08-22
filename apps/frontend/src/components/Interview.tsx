@@ -29,6 +29,7 @@ export function Interview() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isEndingRef = useRef(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pre-join Mic Test State
   const [isTestingMic, setIsTestingMic] = useState(false);
@@ -119,6 +120,19 @@ export function Interview() {
     setTestVolume(0);
   };
 
+  const startHeartbeat = (ws: WebSocket) => {
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN && !isEndingRef.current) {
+        try {
+          ws.send(JSON.stringify({ type: "ping" }));
+        } catch (e) {
+          console.warn("[Interview] Heartbeat send failed:", e);
+        }
+      }
+    }, 15000);
+  };
+
   // Auto-reconnect loop (up to 10 attempts / 30 seconds)
   const attemptReconnect = (attempt = 1) => {
     if (isEndingRef.current || !interviewId) return;
@@ -141,11 +155,17 @@ export function Interview() {
 
       socket.onopen = () => {
         console.log(`[Interview] Auto-reconnected to backend on attempt ${attempt}`);
+        startHeartbeat(socket);
       };
 
       socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === "pong") {
+            // Heartbeat response acknowledged by server
+            return;
+          }
 
           if (data.type === "ready" || data.type === "reconnected") {
             if (data.model) setActiveModel(data.model);
@@ -233,11 +253,17 @@ export function Interview() {
 
       socket.onopen = () => {
         console.log("[Interview] WebSocket connected to backend");
+        startHeartbeat(socket);
       };
 
       socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === "pong") {
+            // Heartbeat response acknowledged by server
+            return;
+          }
 
           if (data.type === "ready" || data.type === "reconnected") {
             if (data.model) setActiveModel(data.model);
@@ -331,6 +357,10 @@ export function Interview() {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
     }
     stopMicTest(false);
     if (timerIntervalRef.current) {

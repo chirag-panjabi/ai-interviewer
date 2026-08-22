@@ -33,6 +33,13 @@ export class LiveAudioPlayer {
         this.ctx.resume().catch(() => {});
       }
 
+      this.ctx.onstatechange = () => {
+        if (this.ctx && this.ctx.state === "suspended") {
+          console.log("[LiveAudioPlayer] Context suspended by browser. Auto-resuming...");
+          this.ctx.resume().catch(() => {});
+        }
+      };
+
       // Play 1ms silent buffer to unlock hardware output
       const silentBuffer = this.ctx.createBuffer(1, 24, 24000);
       const source = this.ctx.createBufferSource();
@@ -112,7 +119,11 @@ export class LiveAudioPlayer {
       }
 
       const now = ctx.currentTime;
-      const startTime = Math.max(now, this.nextPlayTime);
+      // If there was a long pause, reset nextPlayTime to current time
+      if (this.nextPlayTime < now) {
+        this.nextPlayTime = now;
+      }
+      const startTime = this.nextPlayTime;
       source.start(startTime);
       this.nextPlayTime = startTime + audioBuffer.duration;
 
@@ -218,6 +229,8 @@ function calculateRms(samples: Float32Array): number {
 export class LiveMicrophoneRecorder {
   private mediaStream: MediaStream | null = null;
   private audioCtx: AudioContext | null = null;
+  private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private silentGainNode: GainNode | null = null;
   private processorNode: ScriptProcessorNode | null = null;
   private onPcmData: (base64Pcm: string) => void;
   private currentVolume = 0;
@@ -242,16 +255,30 @@ export class LiveMicrophoneRecorder {
 
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     this.audioCtx = new AudioCtx();
+
     if (this.audioCtx.state === "suspended") {
       await this.audioCtx.resume();
     }
 
-    const source = this.audioCtx.createMediaStreamSource(this.mediaStream);
+    // Auto-resume if browser suspends AudioContext during long silence
+    this.audioCtx.onstatechange = () => {
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        console.log("[LiveMicrophoneRecorder] AudioContext suspended by browser. Auto-resuming...");
+        this.audioCtx.resume().catch(() => {});
+      }
+    };
+
+    // Store sourceNode on class instance to prevent V8/WebKit garbage collection during silence
+    this.sourceNode = this.audioCtx.createMediaStreamSource(this.mediaStream);
 
     // Buffer size 2048 gives ~42ms low latency at 48kHz
     this.processorNode = this.audioCtx.createScriptProcessor(2048, 1, 1);
 
     this.processorNode.onaudioprocess = (e) => {
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+
       const inputData = e.inputBuffer.getChannelData(0);
       this.currentVolume = calculateRms(inputData);
 
@@ -262,13 +289,13 @@ export class LiveMicrophoneRecorder {
       this.onPcmData(base64);
     };
 
-    source.connect(this.processorNode);
+    this.sourceNode.connect(this.processorNode);
 
-    // Mute local feedback
-    const silentGain = this.audioCtx.createGain();
-    silentGain.gain.value = 0;
-    this.processorNode.connect(silentGain);
-    silentGain.connect(this.audioCtx.destination);
+    // Mute local feedback - store gainNode on class instance to prevent GC
+    this.silentGainNode = this.audioCtx.createGain();
+    this.silentGainNode.gain.value = 0;
+    this.processorNode.connect(this.silentGainNode);
+    this.silentGainNode.connect(this.audioCtx.destination);
   }
 
   public getVolumeLevel(): number {
@@ -276,9 +303,17 @@ export class LiveMicrophoneRecorder {
   }
 
   public stop(): void {
+    if (this.sourceNode) {
+      this.sourceNode.disconnect();
+      this.sourceNode = null;
+    }
     if (this.processorNode) {
       this.processorNode.disconnect();
       this.processorNode = null;
+    }
+    if (this.silentGainNode) {
+      this.silentGainNode.disconnect();
+      this.silentGainNode = null;
     }
     if (this.audioCtx && this.audioCtx.state !== "closed") {
       this.audioCtx.close().catch(() => {});

@@ -326,18 +326,29 @@ ${reposList}`;
       geminiWs.on("error", (err) => {
         console.error(`[GeminiLive] Gemini WS Error (${interviewId}):`, err.message);
         try {
-          activeClientWs.send(JSON.stringify({ type: "error", message: "Live audio session error" }));
+          if (activeClientWs.readyState === WsClient.OPEN && !isExplicitEnd) {
+            activeClientWs.send(JSON.stringify({ type: "error", message: "Live audio upstream error" }));
+            activeClientWs.close(4001, "Upstream Gemini error");
+          }
         } catch (e) {}
       });
 
       geminiWs.on("close", (code, reason) => {
         console.log(`[GeminiLive] Gemini WS Closed (${interviewId}): ${code} - ${reason.toString()}`);
         cleanup();
+        try {
+          if (activeClientWs.readyState === WsClient.OPEN && !isExplicitEnd) {
+            activeClientWs.close(4000, "Upstream Gemini session closed");
+          }
+        } catch (e) {}
       });
     } catch (err: any) {
       console.error("[GeminiLive] Init error:", err);
       try {
-        activeClientWs.send(JSON.stringify({ type: "error", message: err.message }));
+        if (activeClientWs.readyState === WsClient.OPEN) {
+          activeClientWs.send(JSON.stringify({ type: "error", message: err.message }));
+          activeClientWs.close(4002, "Init error");
+        }
       } catch (e) {}
       cleanup();
     }

@@ -33,10 +33,19 @@ function getBackendUrl(): string {
     // ignore
   }
 
-  // 4. Localhost fallback
+  // 4. Dynamic hostname resolution (Localhost, 127.0.0.1, or Local Network IP for Phone testing)
   if (typeof window !== "undefined" && window.location) {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "http://localhost:3001";
+    const { hostname, protocol } = window.location;
+    const isLocalOrLan =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".local") ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+    if (isLocalOrLan) {
+      return `${protocol}//${hostname}:3001`;
     }
   }
 

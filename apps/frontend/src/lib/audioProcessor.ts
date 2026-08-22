@@ -21,7 +21,12 @@ export class LiveAudioPlayer {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!this.ctx || this.ctx.state === "closed") {
-        this.ctx = new AudioCtx({ sampleRate: 24000 });
+        try {
+          this.ctx = new AudioCtx({ sampleRate: 24000 });
+        } catch {
+          // Safari WebKit does not allow custom sampleRate on new AudioContext
+          this.ctx = new AudioCtx();
+        }
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 256;
         this.analyser.smoothingTimeConstant = 0.8;

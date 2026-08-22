@@ -32,7 +32,12 @@ app.use(
       if (!origin) return callback(null, true);
       if (
         origin.startsWith("http://localhost:") ||
+        origin.startsWith("https://localhost:") ||
         origin.startsWith("http://127.0.0.1:") ||
+        origin.startsWith("https://127.0.0.1:") ||
+        /^https?:\/\/192\.168\./.test(origin) ||
+        /^https?:\/\/10\./.test(origin) ||
+        /^https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\./.test(origin) ||
         origin.endsWith(".vercel.app") ||
         origin === config.CORS_ORIGIN
       ) {
@@ -40,6 +45,8 @@ app.use(
       }
       callback(null, true);
     },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "Range"],
     credentials: true,
   })
 );

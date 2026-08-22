@@ -723,48 +723,72 @@ ${isDSA ? `NOTE: For DSA track, the output JSON category keys map as:
 - communication -> Communication & Invariants score and feedback
 - depth -> Complexity Analysis & Memory Bounds score and feedback` : ""}
 
-### STRICT OUTPUT FORMAT INSTRUCTIONS:
-- You must respond with ONLY a valid, parseable JSON object matching the schema below.
-- Do NOT output any markdown commentary outside the JSON block.
-- Provide detailed, constructive, and actionable feedback in every field.
-- In the "evidence" array, extract 2 to 4 verbatim quotes directly from the transcript, each paired with a sharp technical assessment.
+### STRICT OUTPUT QUALITY & DEPTH REQUIREMENTS:
+1. **No One-Line Shortcuts**: Every text field must contain rich, multi-sentence technical analysis. Never return a single generic sentence.
+2. **summary (3–4 full sentences)**:
+   - Sentence 1: Executive overview of the candidate's technical breadth and primary focus areas during the interview.
+   - Sentence 2: Quality of problem-solving instincts, system trade-offs, and failure mode analysis.
+   - Sentence 3: Explicit calibration sentence: "Declared: ${experienceLevel} | Observed: [Junior / Mid-Level / Senior / Staff-leaning] capability."
+   - Sentence 4: Clear hiring justification aligning with the final recommendation.
+3. **categories.*.feedback (2–3 full sentences per category, ~60–90 words)**:
+   - Must be a complete, structured paragraph for EVERY category.
+   - Sentence 1: Concrete technical concepts, APIs, protocols, or data structures demonstrated by the candidate in this category.
+   - Sentence 2: Specific evaluation of how effectively trade-offs, edge cases, and constraints were reasoned through.
+   - Sentence 3: Constructive feedback noting either exceptional mastery or the specific nuance required for higher-tier calibration.
+4. **strengths (3 to 5 comprehensive items)**:
+   - Each item must be a detailed, specific sentence naming the exact architectural choice, algorithm, or pattern used (e.g. "Implemented resilient backpressure via Redis atomic Lua scripts...").
+5. **improvements (3 to 4 actionable, growth-oriented items)**:
+   - Each item must be 1–2 complete sentences highlighting a technical gap AND explicitly recommending the exact concept, RFC, algorithm, or production pattern to study (e.g. "Study Redis XAUTOCLAIM and Pending Entries List (PEL) inspection for handling consumer worker crashes...").
+6. **evidence (3 to 5 verbatim quotes)**:
+   - Extract 3 to 5 distinct verbatim candidate quotes from different phases of the interview.
+   - Each quote MUST have a 2-sentence technical assessment analyzing what engineering signal the quote provides.
 
-JSON Schema:
+### STRICT JSON SCHEMA:
+Respond with ONLY a valid, parseable JSON object matching this schema without markdown fences outside the JSON:
 {
   "overallScore": number (0.0 to 10.0, one decimal place),
   "recommendation": "Strong Hire" | "Hire" | "Lean Hire" | "No Hire",
-  "summary": "string (2-3 concise sentences detailing executive assessment and observed level)",
+  "summary": "string (3-4 comprehensive sentences detailing technical overview, reasoning depth, level calibration, and hiring justification)",
   "categories": {
     "technicalAccuracy": {
       "score": number (0.0 to 10.0),
-      "feedback": "string (detailed domain-specific feedback on correctness and mechanics)"
+      "feedback": "string (Rich 2-3 sentence paragraph analyzing specific APIs, protocols, correctness, and domain mechanics)"
     },
     "problemSolving": {
       "score": number (0.0 to 10.0),
-      "feedback": "string (detailed feedback on trade-offs and edge case handling)"
+      "feedback": "string (Rich 2-3 sentence paragraph analyzing constraints, trade-off depth, and edge-case handling)"
     },
     "communication": {
       "score": number (0.0 to 10.0),
-      "feedback": "string (feedback on structure, articulation, and conciseness)"
+      "feedback": "string (Rich 2-3 sentence paragraph evaluating structure, articulation, technical precision, and conciseness)"
     },
     "depth": {
       "score": number (0.0 to 10.0),
-      "feedback": "string (feedback on underlying systems depth vs superficial buzzwords)"
+      "feedback": "string (Rich 2-3 sentence paragraph dissecting underlying systems mastery vs superficial high-level terminology)"
     }
   },
   "strengths": [
-    "string (Top strength with technical specifics)",
-    "string (Second key strength)",
-    "string (Third key strength)"
+    "string (Detailed 1-2 sentence strength with specific architectural or algorithmic citations)",
+    "string (Second key technical strength)",
+    "string (Third key technical strength)"
   ],
   "improvements": [
-    "string (Concrete actionable area for technical improvement)",
-    "string (Second actionable improvement area)"
+    "string (Detailed 1-2 sentence actionable improvement area with specific tools/patterns to study)",
+    "string (Second actionable improvement area)",
+    "string (Third actionable improvement area)"
   ],
   "evidence": [
     {
-      "quote": "string (verbatim transcript excerpt)",
-      "assessment": "string (concrete technical analysis of why this quote demonstrates mastery or a gap)"
+      "quote": "string (verbatim candidate quote from transcript)",
+      "assessment": "string (2-sentence sharp technical assessment of why this quote demonstrates mastery or a specific gap)"
+    },
+    {
+      "quote": "string (second verbatim candidate quote)",
+      "assessment": "string (2-sentence technical assessment)"
+    },
+    {
+      "quote": "string (third verbatim candidate quote)",
+      "assessment": "string (2-sentence technical assessment)"
     }
   ]
 }`;

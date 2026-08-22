@@ -1,4 +1,5 @@
 import { Router } from "express";
+import axios from "axios";
 import { PreInterviewBody } from "../types";
 import { scrapeGithub, getGithubReposPreview } from "../services/github";
 import { prisma } from "../db";
@@ -7,7 +8,68 @@ import { interviewCreationLimiter } from "../middleware/rateLimiter";
 
 export const interviewRouter = Router();
 
-// 1. Preview candidate GitHub repositories (Cached, fast response)
+// 1. Live Google Gemini API Key Verification (Fast ping check)
+interviewRouter.post("/verify-key", async (req, res) => {
+  const { apiKey } = req.body;
+  if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
+    res.status(400).json({ valid: false, error: "API key cannot be empty." });
+    return;
+  }
+
+  const cleanKey = apiKey.trim();
+  if (cleanKey.length < 15) {
+    res.status(400).json({ valid: false, error: "API key is too short. Expected a valid Google Gemini API key." });
+    return;
+  }
+
+  if (cleanKey.startsWith("sk-") || cleanKey.startsWith("ghp_") || cleanKey.startsWith("gho_")) {
+    res.status(400).json({ valid: false, error: "This looks like an OpenAI or GitHub token. Please provide a Google Gemini API key." });
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`,
+      { timeout: 8000 }
+    );
+
+    if (response.status === 200) {
+      res.json({ valid: true, modelsCount: response.data?.models?.length || 0 });
+      return;
+    }
+
+    res.json({ valid: false, error: "Unexpected response from Google API." });
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const errData = err?.response?.data?.error;
+    const msg = errData?.message || err?.message || "Google rejected this API key.";
+
+    console.warn(`[KeyVerification] Key verification rejected by Google (HTTP ${status || "unknown"}): ${msg}`);
+
+    if (status === 400 || status === 403) {
+      res.json({
+        valid: false,
+        error: `Google rejected this key: ${errData?.message || "Invalid API key"}. Please check your key in Google AI Studio.`,
+      });
+      return;
+    }
+
+    if (status === 429) {
+      res.json({
+        valid: false,
+        error: "Google API rate limit / quota exceeded for this key.",
+      });
+      return;
+    }
+
+    res.json({
+      valid: false,
+      error: `Could not verify key with Google (${msg}).`,
+    });
+  }
+});
+
+// 2. Preview candidate GitHub repositories (Cached, fast response)
 interviewRouter.post("/github-preview", async (req, res) => {
   const { github } = req.body;
   if (!github || typeof github !== "string" || !github.trim()) {

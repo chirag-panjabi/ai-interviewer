@@ -1,3 +1,6 @@
+import axios from "axios";
+import { BACKEND_URL } from "./config";
+
 const STORAGE_KEY = "gemini_custom_api_key";
 
 export function getCustomApiKey(): string | null {
@@ -65,4 +68,49 @@ export function validateApiKeyFormat(key: string): { isValid: boolean; error?: s
     };
   }
   return { isValid: true };
+}
+
+export async function verifyGeminiApiKey(key: string): Promise<{ isValid: boolean; error?: string }> {
+  const formatCheck = validateApiKeyFormat(key);
+  if (!formatCheck.isValid) {
+    return formatCheck;
+  }
+
+  const trimmed = key.trim();
+
+  // Try backend verification endpoint first
+  try {
+    const res = await axios.post(
+      `${BACKEND_URL}/api/v1/verify-key`,
+      { apiKey: trimmed },
+      { timeout: 8000 }
+    );
+    if (res.data?.valid) {
+      return { isValid: true };
+    }
+    return {
+      isValid: false,
+      error: res.data?.error || "Google rejected this API key. Please check your key in Google AI Studio.",
+    };
+  } catch (err: any) {
+    // If backend verification fails or times out, fallback to direct client-side Google ping
+    try {
+      const googleRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(trimmed)}`
+      );
+      if (googleRes.ok) {
+        return { isValid: true };
+      }
+      const data = await googleRes.json().catch(() => ({}));
+      return {
+        isValid: false,
+        error:
+          data?.error?.message ||
+          "Google rejected this API key. Please verify your key in Google AI Studio.",
+      };
+    } catch {
+      // If network cannot reach Google at all, allow saving if syntax is valid
+      return { isValid: true };
+    }
+  }
 }

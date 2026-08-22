@@ -11,13 +11,14 @@ import {
   X,
   Server,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   getCustomApiKey,
   setCustomApiKey,
   removeCustomApiKey,
   maskApiKey,
-  validateApiKeyFormat,
+  verifyGeminiApiKey,
 } from "../lib/apiKeyStorage";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
   const [showKey, setShowKey] = useState(false);
   const [existingKey, setExistingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -39,12 +41,13 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
       setExistingKey(current);
       setApiKeyInput(current || "");
       setError(null);
+      setIsVerifying(false);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  function handleSave() {
+  async function handleSave() {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) {
       removeCustomApiKey();
@@ -55,17 +58,27 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
       return;
     }
 
-    const { isValid, error: validationError } = validateApiKeyFormat(trimmed);
-    if (!isValid) {
-      setError(validationError || "Invalid Gemini API key format.");
-      return;
-    }
+    setIsVerifying(true);
+    setError(null);
 
-    setCustomApiKey(trimmed);
-    setExistingKey(trimmed);
-    toast.success("Gemini API Key saved! Unlimited practice mode enabled.");
-    onKeyChange?.(true);
-    onClose();
+    try {
+      const { isValid, error: verificationError } = await verifyGeminiApiKey(trimmed);
+      if (!isValid) {
+        setError(verificationError || "Google rejected this API key.");
+        setIsVerifying(false);
+        return;
+      }
+
+      setCustomApiKey(trimmed);
+      setExistingKey(trimmed);
+      toast.success("✨ Gemini API Key verified & activated! Unlimited practice mode enabled.");
+      onKeyChange?.(true);
+      onClose();
+    } catch {
+      setError("Could not complete key verification. Please check your connection.");
+    } finally {
+      setIsVerifying(false);
+    }
   }
 
   function handleRemove() {
@@ -221,11 +234,21 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
           </button>
           <button
             type="button"
+            disabled={isVerifying}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
-            <CheckCircle2 className="size-3.5" />
-            Save & Apply
+            {isVerifying ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                Verifying with Google...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="size-3.5" />
+                Save & Apply
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -551,22 +551,11 @@ export function Form() {
                       ? "Select flagship project for Alex to discuss (or skip):"
                       : `Choose interview focus for @${parsed.username}:`}
                   </span>
-                  <div className="flex items-center gap-2">
-                    {profilePreview?.name && hasRepos && (
-                      <span className="text-[11px] text-foreground/80 font-normal">
-                        @{profilePreview.username} ({profilePreview.publicReposCount} repos)
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => triggerPreviewFetch(github)}
-                      disabled={fetchingPreview || loading}
-                      className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-                    >
-                      <RefreshCw className={cn("size-2.5", fetchingPreview && "animate-spin")} />
-                      Scan
-                    </button>
-                  </div>
+                  {profilePreview?.name && hasRepos && (
+                    <span className="text-[11px] text-foreground/80 font-normal">
+                      @{profilePreview.username} ({profilePreview.publicReposCount} repos)
+                    </span>
+                  )}
                 </div>
 
                 {!hasRepos && !fetchingPreview && (
@@ -577,7 +566,9 @@ export function Form() {
                       </span>
                     ) : profilePreview?.error ? (
                       <span>
-                        💡 {profilePreview.error} You can select <strong>General Domain</strong> or specify any public repo below:
+                        💡 {profilePreview.error.toLowerCase().includes("certificate") || profilePreview.error.toLowerCase().includes("tls")
+                          ? "Could not connect to GitHub API from backend server. You can select General Domain or specify your repo below:"
+                          : `${profilePreview.error} You can select General Domain or specify any public repo below:`}
                       </span>
                     ) : (
                       <span>

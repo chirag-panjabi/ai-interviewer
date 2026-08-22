@@ -27,6 +27,7 @@ import {
   Clock,
   ShieldCheck,
   Plus,
+  X,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -568,31 +569,43 @@ export function Result() {
                   </div>
 
                   {/* Transcript Controls */}
-                  <div className="flex flex-wrap items-center gap-2" data-no-print>
-                    <div className="relative flex items-center">
-                      <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
+                  <div className="flex flex-wrap items-center gap-2.5" data-no-print>
+                    {/* Responsive Search Input */}
+                    <div className="relative flex items-center group">
+                      <Search className="absolute left-2.5 size-3.5 text-muted-foreground pointer-events-none transition-colors group-focus-within:text-foreground" />
                       <Input
                         aria-label="Search interview transcript by keyword"
                         placeholder="Search transcript..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-8 w-44 rounded-lg pl-8 text-xs bg-background/60 font-mono"
+                        className="h-8 w-48 sm:w-56 focus-within:w-60 rounded-lg pl-8 pr-7 text-xs bg-background/70 border-border/70 placeholder:text-muted-foreground transition-all duration-200 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/60"
                       />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Clear search input"
+                          className="absolute right-2 size-4 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors duration-150 cursor-pointer"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
                     </div>
 
+                    {/* Unified Segmented Speaker Rail */}
                     <div
                       role="tablist"
                       aria-label="Filter transcript by speaker"
-                      className="flex rounded-lg border border-border/60 bg-background/60 p-0.5 text-xs"
+                      className="flex h-8 items-center rounded-lg border border-border/70 bg-background/70 p-0.5 text-xs shadow-none"
                     >
                       <button
                         role="tab"
                         aria-selected={roleFilter === "all"}
                         onClick={() => setRoleFilter("all")}
                         className={cn(
-                          "rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 cursor-pointer",
+                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
                           roleFilter === "all"
-                            ? "bg-primary text-primary-foreground shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -603,9 +616,9 @@ export function Result() {
                         aria-selected={roleFilter === "Assistant"}
                         onClick={() => setRoleFilter("Assistant")}
                         className={cn(
-                          "rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 cursor-pointer",
+                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
                           roleFilter === "Assistant"
-                            ? "bg-primary text-primary-foreground shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -616,9 +629,9 @@ export function Result() {
                         aria-selected={roleFilter === "User"}
                         onClick={() => setRoleFilter("User")}
                         className={cn(
-                          "rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 cursor-pointer",
+                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
                           roleFilter === "User"
-                            ? "bg-primary text-primary-foreground shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >

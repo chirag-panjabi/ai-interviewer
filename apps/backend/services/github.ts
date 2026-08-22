@@ -239,7 +239,7 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
   }
 }
 
-export async function scrapeGithub(input: string, explicitSelectedRepo?: string): Promise<GithubPortfolio> {
+export async function scrapeGithub(input: string, explicitSelectedRepo?: string | null): Promise<GithubPortfolio> {
   const { username, repoName: parsedRepoName } = parseGithubInput(input);
   const targetRepoName = explicitSelectedRepo || parsedRepoName;
   const headers = getGithubHeaders();

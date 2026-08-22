@@ -86,16 +86,19 @@ interviewRouter.post("/github-preview", async (req, res) => {
   }
 });
 
-// 2. Ingest GitHub profile and initialize interview (Rate limited to 15 / day / IP)
+// 2. Ingest GitHub profile and initialize interview (Rate limited to configurable daily limit per IP)
 interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
-  const { success, data } = PreInterviewBody.safeParse(req.body);
+  const result = PreInterviewBody.safeParse(req.body);
 
-  if (!success) {
+  if (!result.success) {
+    const errorDetails = result.error.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join(", ");
     res.status(400).json({
-      message: "Invalid request body. Expected { github: string }.",
+      message: `Invalid request parameters (${errorDetails}).`,
     });
     return;
   }
+
+  const data = result.data;
 
   try {
     const githubData = await scrapeGithub(data.github, data.selectedRepo);

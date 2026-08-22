@@ -134,9 +134,22 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
+    "process.env.BUN_PUBLIC_BACKEND_URL": JSON.stringify(process.env.BUN_PUBLIC_BACKEND_URL || ""),
+    "process.env.VITE_BACKEND_URL": JSON.stringify(process.env.VITE_BACKEND_URL || ""),
   },
   ...cliConfig,
 });
+
+// Copy public assets & _redirects to dist if present
+const publicDir = path.join(process.cwd(), "public");
+if (existsSync(publicDir)) {
+  const publicFiles = [...new Bun.Glob("**/*").scanSync(publicDir)];
+  for (const relPath of publicFiles) {
+    const srcFile = path.join(publicDir, relPath);
+    const destFile = path.join(outdir, relPath);
+    await Bun.write(destFile, Bun.file(srcFile));
+  }
+}
 
 const end = performance.now();
 

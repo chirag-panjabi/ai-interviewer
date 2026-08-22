@@ -1,7 +1,12 @@
 const defaultBackendUrl = "http://localhost:3001";
 
 export const BACKEND_URL =
-  (typeof process !== "undefined" && process.env?.BUN_PUBLIC_BACKEND_URL) ||
+  (typeof process !== "undefined" && (
+    process.env?.BUN_PUBLIC_BACKEND_URL ||
+    process.env?.VITE_BACKEND_URL ||
+    process.env?.NEXT_PUBLIC_BACKEND_URL ||
+    process.env?.REACT_APP_BACKEND_URL
+  )) ||
   (typeof window !== "undefined" && (window as any).__ENV__?.BACKEND_URL) ||
   defaultBackendUrl;
 

@@ -2,30 +2,41 @@
 
 @layer base {
   :root {
-    @apply font-sans;
+    --color-paper: oklch(0.14 0.01 250);
+    --color-paper-elevated: oklch(0.18 0.015 250);
+    --color-paper-subtle: oklch(0.16 0.01 250);
+    --color-rule: oklch(1 0 0 / 10%);
+    --color-rule-active: oklch(1 0 0 / 20%);
+    --ease-out-tactile: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  html,
+  html {
+    @apply m-0 min-h-screen bg-background text-foreground antialiased;
+    overflow-x: clip;
+  }
+
   body {
-    @apply m-0 min-h-screen min-w-[320px] bg-background text-foreground antialiased;
+    @apply m-0 min-h-screen min-w-[320px] bg-background text-foreground;
+    overflow-x: clip;
   }
 
   #root {
-    @apply min-h-screen;
+    @apply min-h-screen flex flex-col;
   }
 }
 
-/* Soft ambient background glow for the dark theme */
+/* Hallmark tactile engineering canvas: clean subtle coordinate grid */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(60% 50% at 20% 0%, oklch(0.488 0.243 264.376 / 0.18), transparent 70%),
-    radial-gradient(50% 50% at 90% 10%, oklch(0.696 0.17 162.48 / 0.12), transparent 70%),
-    radial-gradient(60% 60% at 50% 100%, oklch(0.627 0.265 303.9 / 0.1), transparent 70%);
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at 50% 25%, black 40%, transparent 90%);
 }
 
 @media (prefers-reduced-motion) {
@@ -33,6 +44,7 @@ body::before {
   ::before,
   ::after {
     animation: none !important;
+    transition: none !important;
   }
 }
 

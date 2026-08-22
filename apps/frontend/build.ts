@@ -129,9 +129,9 @@ const resolvedBackendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.REACT_APP_BACKEND_URL ||
   process.env.BACKEND_URL ||
-  "";
+  "https://ai-interviewer-backend-6jio.onrender.com";
 
-console.log(`🔗 Target Backend URL: ${resolvedBackendUrl || "(fallback: http://localhost:3001)"}\n`);
+console.log(`🔗 Target Backend URL: ${resolvedBackendUrl}\n`);
 
 const result = await Bun.build({
   entrypoints,

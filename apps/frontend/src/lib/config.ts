@@ -47,9 +47,14 @@ function getBackendUrl(): string {
     if (isLocalOrLan) {
       return `${protocol}//${hostname}:3001`;
     }
+
+    // Production Vercel or any HTTPS origin: Use deployed backend to prevent Safari mixed-content blocks
+    if (protocol === "https:" || hostname.endsWith(".vercel.app")) {
+      return "https://ai-interviewer-backend-6jio.onrender.com";
+    }
   }
 
-  return "http://localhost:3001";
+  return "https://ai-interviewer-backend-6jio.onrender.com";
 }
 
 export const BACKEND_URL: string = getBackendUrl();

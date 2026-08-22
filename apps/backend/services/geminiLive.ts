@@ -41,7 +41,34 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
   let audioChunkCount = 0;
   let activeClientWs = clientWs;
   let graceTimeout: ReturnType<typeof setTimeout> | null = null;
+  let turnSequence = 0;
+  let dbWriteQueue = Promise.resolve();
   const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview";
+
+  function persistTurn(type: "User" | "Assistant", message: string, wasInterrupted = false) {
+    const text = message.trim();
+    if (!text) return;
+
+    turnSequence++;
+    const currentTurnIndex = turnSequence;
+
+    dbWriteQueue = dbWriteQueue.then(async () => {
+      try {
+        console.log(`[GeminiLive] Persisting Turn #${currentTurnIndex} [${type}] (interrupted: ${wasInterrupted}) for ${interviewId}`);
+        await prisma.message.create({
+          data: {
+            interviewId,
+            type,
+            message: text,
+            turnIndex: currentTurnIndex,
+            wasInterrupted,
+          },
+        });
+      } catch (e) {
+        console.error(`[GeminiLive] Error persisting Turn #${currentTurnIndex}:`, e);
+      }
+    });
+  }
 
   const sessionObj: ActiveSession = {
     interviewId,
@@ -143,6 +170,7 @@ ${reposList}`;
       });
 
       const isResumingSession = existingMessages.length > 0;
+      turnSequence = existingMessages.length;
 
       let systemPrompt = buildSystemPrompt({
         experienceLevel: (interview.experienceLevel as any) || "MID",
@@ -291,14 +319,7 @@ ${transcriptHistory}
               if (currentUserTranscript.trim()) {
                 const userText = currentUserTranscript.trim();
                 currentUserTranscript = "";
-                console.log(`[GeminiLive] User spoke: "${userText}"`);
-                await prisma.message.create({
-                  data: {
-                    interviewId,
-                    type: "User",
-                    message: userText,
-                  },
-                });
+                persistTurn("User", userText, false);
               }
             }
 
@@ -327,18 +348,7 @@ ${transcriptHistory}
               if (currentAssistantTranscript.trim()) {
                 const interruptedText = currentAssistantTranscript.trim();
                 currentAssistantTranscript = "";
-                console.log(`[GeminiLive] Interrupted assistant turn saved: "${interruptedText}"`);
-                try {
-                  await prisma.message.create({
-                    data: {
-                      interviewId,
-                      type: "Assistant",
-                      message: interruptedText,
-                    },
-                  });
-                } catch (e) {
-                  console.error("Error saving interrupted assistant message:", e);
-                }
+                persistTurn("Assistant", interruptedText, true);
               }
             }
 
@@ -350,14 +360,7 @@ ${transcriptHistory}
               if (currentAssistantTranscript.trim()) {
                 const assistantText = currentAssistantTranscript.trim();
                 currentAssistantTranscript = "";
-                console.log(`[GeminiLive] Alex turn completed: "${assistantText}"`);
-                await prisma.message.create({
-                  data: {
-                    interviewId,
-                    type: "Assistant",
-                    message: assistantText,
-                  },
-                });
+                persistTurn("Assistant", assistantText, false);
               }
             }
           }
@@ -409,31 +412,13 @@ ${transcriptHistory}
 
     // Flush any remaining transcripts to database
     if (currentUserTranscript.trim()) {
-      try {
-        await prisma.message.create({
-          data: {
-            interviewId,
-            type: "User",
-            message: currentUserTranscript.trim(),
-          },
-        });
-      } catch (e) {
-        console.error("Error saving remaining user transcript:", e);
-      }
+      persistTurn("User", currentUserTranscript.trim(), false);
+      currentUserTranscript = "";
     }
 
     if (currentAssistantTranscript.trim()) {
-      try {
-        await prisma.message.create({
-          data: {
-            interviewId,
-            type: "Assistant",
-            message: currentAssistantTranscript.trim(),
-          },
-        });
-      } catch (e) {
-        console.error("Error saving remaining assistant transcript:", e);
-      }
+      persistTurn("Assistant", currentAssistantTranscript.trim(), false);
+      currentAssistantTranscript = "";
     }
 
     if (geminiWs && geminiWs.readyState === WsClient.OPEN) {

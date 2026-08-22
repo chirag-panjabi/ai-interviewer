@@ -58,7 +58,13 @@ interface ResultData {
   evaluationData?: EvaluationData;
   experienceLevel?: "JUNIOR" | "MID" | "SENIOR";
   track?: string;
-  transcript: { type: "Assistant" | "User"; content: string; createdAt: string }[];
+  transcript: {
+    type: "Assistant" | "User";
+    content: string;
+    turnIndex?: number;
+    wasInterrupted?: boolean;
+    createdAt: string;
+  }[];
   status: string;
 }
 
@@ -532,13 +538,20 @@ export function Result() {
                     </div>
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm flex flex-col gap-1.5",
                         isAi
                           ? "rounded-tl-sm border border-border/50 bg-card text-foreground"
                           : "rounded-tr-sm bg-primary text-primary-foreground"
                       )}
                     >
-                      {m.content}
+                      <p>{m.content}</p>
+                      {m.wasInterrupted && (
+                        <div className="flex items-center gap-1 self-start">
+                          <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                            Interrupted by user
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

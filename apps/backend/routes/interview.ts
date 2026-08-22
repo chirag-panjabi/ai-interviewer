@@ -67,7 +67,14 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
   try {
     const interview = await prisma.interview.findFirst({
       where: { id: interviewId },
-      include: { conversations: { orderBy: { createdAt: "asc" } } },
+      include: {
+        conversations: {
+          orderBy: [
+            { turnIndex: "asc" },
+            { createdAt: "asc" },
+          ],
+        },
+      },
     });
 
     if (!interview) {
@@ -78,6 +85,8 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
     const transcript = interview.conversations.map((c) => ({
       type: c.type,
       content: c.message,
+      turnIndex: c.turnIndex,
+      wasInterrupted: c.wasInterrupted,
       createdAt: c.createdAt,
     }));
 

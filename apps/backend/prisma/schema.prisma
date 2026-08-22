@@ -30,11 +30,14 @@ model Message {
   id              String      @id  @default(uuid())
   message         String
   type            MessageType
+  turnIndex       Int         @default(0)
+  wasInterrupted  Boolean     @default(false)
   interviewId     String
   interview       Interview   @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   createdAt       DateTime    @default(now())
 
   @@index([interviewId, createdAt])
+  @@index([interviewId, turnIndex])
 }
 
 enum MessageType {

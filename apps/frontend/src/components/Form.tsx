@@ -522,28 +522,10 @@ export function Form() {
             const parsed = parseInput(github);
             if (!parsed.isValid || !parsed.username) return null;
 
-            // Loading Skeleton
-            if (fetchingPreview && !profilePreview) {
-              return (
-                <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="size-3.5 animate-spin text-primary" />
-                      Scanning GitHub repositories for @{parsed.username}...
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="h-16 rounded-xl border border-border/40 bg-card/20 animate-pulse" />
-                    <div className="h-16 rounded-xl border border-border/40 bg-card/20 animate-pulse" />
-                  </div>
-                </div>
-              );
-            }
-
             const hasRepos = profilePreview && profilePreview.repos && profilePreview.repos.length > 0;
 
             return (
-              <div className="mt-4 space-y-2.5 animate-in fade-in duration-200">
+              <div className={cn("mt-4 space-y-2.5 transition-opacity duration-200", fetchingPreview && "opacity-75")}>
                 <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <FolderGit2 className="size-3.5 text-primary" />
@@ -558,26 +540,6 @@ export function Form() {
                   )}
                 </div>
 
-                {!hasRepos && !fetchingPreview && (
-                  <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-[11px] text-muted-foreground">
-                    {profilePreview?.rateLimited ? (
-                      <span>
-                        ⚠️ GitHub API rate limit reached on server (60 req/hr). Add <code className="rounded bg-muted px-1 text-primary">GITHUB_TOKEN</code> to your backend <code className="rounded bg-muted px-1 text-primary">.env</code> for 5,000 req/hr. In the meantime, select <strong>General Domain</strong> or enter a repo manually below:
-                      </span>
-                    ) : profilePreview?.error ? (
-                      <span>
-                        💡 {profilePreview.error.toLowerCase().includes("certificate") || profilePreview.error.toLowerCase().includes("tls")
-                          ? "Could not connect to GitHub API from backend server. You can select General Domain or specify your repo below:"
-                          : `${profilePreview.error} You can select General Domain or specify any public repo below:`}
-                      </span>
-                    ) : (
-                      <span>
-                        💡 No public repos auto-listed. You can select <strong>General Domain</strong> or specify any public repo below:
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {/* General Domain Screen Option */}
                   <button
@@ -589,7 +551,7 @@ export function Form() {
                       setSelectedRepo(null);
                     }}
                     className={cn(
-                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
                       isGeneralDomainOnly
                         ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
                         : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
@@ -629,7 +591,7 @@ export function Form() {
                             setIsCustomMode(false);
                           }}
                           className={cn(
-                            "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                            "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
                             isSelected
                               ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
                               : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
@@ -681,7 +643,7 @@ export function Form() {
                       setSelectedRepo(null);
                     }}
                     className={cn(
-                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all",
+                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
                       isCustomMode
                         ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
                         : "border-border/70 bg-card/40 hover:border-border hover:bg-card/70",
@@ -701,7 +663,7 @@ export function Form() {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground line-clamp-1">
-                        Enter any specific repository name
+                        Enter any repository name to target
                       </p>
                     </div>
                   </button>
@@ -715,7 +677,7 @@ export function Form() {
                     </span>
                     <Input
                       value={customRepoInput}
-                      placeholder="e.g. ai-interviewer or my-app"
+                      placeholder="e.g. distributed-system or ai-interviewer"
                       onChange={(e) => setCustomRepoInput(e.target.value)}
                       disabled={loading}
                       className="h-8 border-0 bg-transparent text-xs focus-visible:ring-0"

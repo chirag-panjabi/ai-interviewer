@@ -96,64 +96,21 @@ export function parseGithubUsername(input: string): string {
   return parseGithubInput(input).username;
 }
 
-async function fetchReposFromHtmlFallback(username: string): Promise<GithubRepoPreview[]> {
-  try {
-    const res = await axios.get(`https://github.com/${encodeURIComponent(username)}?tab=repositories`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      httpsAgent,
-      timeout: 6000,
-    });
+function getGithubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "User-Agent": "AI-Interviewer-App",
+    Accept: "application/vnd.github.v3+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
 
-    const html = res.data;
-    if (typeof html !== "string") return [];
-
-    const repos: GithubRepoPreview[] = [];
-    const seen = new Set<string>();
-
-    const repoMatchRegex = new RegExp(`href="/${username}/([^"/?#\\s]+)"(?:[^>]*itemprop="name codeRepository"|[^>]*data-hovercard-type="repository")`, "gi");
-    let match;
-    while ((match = repoMatchRegex.exec(html)) !== null) {
-      const repoName = match[1]?.trim();
-      if (repoName && !seen.has(repoName.toLowerCase()) && !["followers", "following", "stars", "tab", "repositories"].includes(repoName.toLowerCase())) {
-        seen.add(repoName.toLowerCase());
-        repos.push({
-          name: repoName,
-          description: null,
-          language: null,
-          stars: 0,
-          url: `https://github.com/${username}/${repoName}`,
-        });
-      }
-      if (repos.length >= 8) break;
-    }
-
-    if (repos.length === 0) {
-      const fallbackRegex = new RegExp(`itemprop="name codeRepository">\\s*([^<\\s]+)\\s*<`, "gi");
-      let fbMatch;
-      while ((fbMatch = fallbackRegex.exec(html)) !== null) {
-        const repoName = fbMatch[1]?.trim();
-        if (repoName && !seen.has(repoName.toLowerCase())) {
-          seen.add(repoName.toLowerCase());
-          repos.push({
-            name: repoName,
-            description: null,
-            language: null,
-            stars: 0,
-            url: `https://github.com/${username}/${repoName}`,
-          });
-        }
-        if (repos.length >= 8) break;
-      }
-    }
-
-    return repos;
-  } catch (err: any) {
-    console.warn(`[GitHubPreview] HTML fallback scraping failed for ${username}:`, err?.message);
-    return [];
+  if (config.GITHUB_TOKEN) {
+    const cleanToken = config.GITHUB_TOKEN.trim().replace(/^["']|["']$/g, "");
+    headers["Authorization"] = cleanToken.startsWith("ghp_") || cleanToken.startsWith("github_pat_")
+      ? `Bearer ${cleanToken}`
+      : `token ${cleanToken}`;
   }
+
+  return headers;
 }
 
 export async function getGithubReposPreview(input: string): Promise<GithubProfilePreview> {
@@ -166,29 +123,22 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
     return cached.data;
   }
 
-  const headers: Record<string, string> = {
-    "User-Agent": "AI-Interviewer-App",
-    Accept: "application/vnd.github.v3+json",
-  };
-
-  if (config.GITHUB_TOKEN) {
-    headers["Authorization"] = `Bearer ${config.GITHUB_TOKEN}`;
-  }
+  const headers = getGithubHeaders();
 
   try {
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
       httpsAgent,
-      timeout: 6000,
+      timeout: 8000,
     });
     const userData = userRes.data;
 
     const reposRes = await axios.get(
-      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=20`,
+      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=30`,
       {
         headers,
         httpsAgent,
-        timeout: 6000,
+        timeout: 8000,
       }
     );
 
@@ -220,20 +170,21 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       name: userData.name || null,
       bio: userData.bio || null,
       avatarUrl: userData.avatar_url || `https://github.com/${username}.png`,
-      publicReposCount: userData.public_repos || previewRepos.length,
+      publicReposCount: userData.public_repos ?? previewRepos.length,
       repos: previewRepos,
     };
 
     previewCache.set(cacheKey, { timestamp: now, data: result });
     return result;
   } catch (err: any) {
-    console.warn(`[GitHubPreview] API rate-limit/error for ${username}: ${err?.response?.data?.message || err.message}. Trying HTML scraper fallback...`);
-    
-    const fallbackRepos = await fetchReposFromHtmlFallback(username);
-    
-    // If specific repo was passed in URL, make sure it's included
-    if (repoName && !fallbackRepos.some(r => r.name.toLowerCase() === repoName.toLowerCase())) {
-      fallbackRepos.unshift({
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.message || err.message;
+    console.error(`[GitHubPreview] API error for ${username} (HTTP ${status || "unknown"}): ${msg}`);
+
+    // If a specific repo was supplied in URL, preserve it in fallback preview
+    const fallbackRepos: GithubRepoPreview[] = [];
+    if (repoName) {
+      fallbackRepos.push({
         name: repoName,
         description: null,
         language: null,
@@ -242,7 +193,7 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       });
     }
 
-    const result: GithubProfilePreview = {
+    return {
       username,
       name: username,
       bio: null,
@@ -250,27 +201,13 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       publicReposCount: fallbackRepos.length,
       repos: fallbackRepos,
     };
-
-    if (fallbackRepos.length > 0) {
-      previewCache.set(cacheKey, { timestamp: now, data: result });
-    }
-
-    return result;
   }
 }
 
 export async function scrapeGithub(input: string, explicitSelectedRepo?: string): Promise<GithubPortfolio> {
   const { username, repoName: parsedRepoName } = parseGithubInput(input);
   const targetRepoName = explicitSelectedRepo || parsedRepoName;
-
-  const headers: Record<string, string> = {
-    "User-Agent": "AI-Interviewer-App",
-    Accept: "application/vnd.github.v3+json",
-  };
-
-  if (config.GITHUB_TOKEN) {
-    headers["Authorization"] = `Bearer ${config.GITHUB_TOKEN}`;
-  }
+  const headers = getGithubHeaders();
 
   try {
     // Fetch user profile info

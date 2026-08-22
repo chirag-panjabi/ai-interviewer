@@ -19,7 +19,7 @@ export const config = {
   GEMINI_API_KEY: getEnv("GEMINI_API_KEY"),
   GEMINI_LIVE_MODEL: getEnv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
   GEMINI_EVAL_MODEL: getEnv("GEMINI_EVAL_MODEL", "gemini-flash-latest"),
-  GITHUB_TOKEN: process.env.GITHUB_TOKEN || undefined,
+  GITHUB_TOKEN: process.env.GITHUB_TOKEN ? process.env.GITHUB_TOKEN.trim().replace(/^["']|["']$/g, "") : undefined,
   PORT: parseInt(getEnv("PORT", "3001"), 10),
   CORS_ORIGIN: getEnv("CORS_ORIGIN", "http://localhost:3000"),
 };
@@ -31,5 +31,12 @@ export function validateConfig() {
 
   if (missing.length > 0) {
     console.warn(`\n⚠️  [AI Interviewer Config] Warning: The following environment variables are missing:\n  - ${missing.join("\n  - ")}\nMake sure to set them in your .env file.\n`);
+  }
+
+  if (config.GITHUB_TOKEN) {
+    const masked = config.GITHUB_TOKEN.slice(0, 4) + "..." + config.GITHUB_TOKEN.slice(-4);
+    console.log(`🔑 [GitHub Auth] GITHUB_TOKEN detected: ${masked} (5,000 req/hr rate limit enabled)`);
+  } else {
+    console.warn(`⚠️  [GitHub Auth] GITHUB_TOKEN is not set. Requests will use the unauthenticated 60 req/hr IP rate limit.`);
   }
 }

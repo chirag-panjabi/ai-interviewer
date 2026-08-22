@@ -46,7 +46,17 @@ app.use(
       callback(null, true);
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "Range"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "X-Requested-With",
+      "Range",
+      "x-gemini-api-key",
+      "x-api-key",
+      "X-Gemini-Api-Key",
+      "X-Api-Key",
+    ],
     credentials: true,
   })
 );

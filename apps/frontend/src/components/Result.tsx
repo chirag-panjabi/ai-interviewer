@@ -93,6 +93,19 @@ const LEVEL_LABELS: Record<string, string> = {
   SENIOR: "Senior · 5+y",
 };
 
+function formatModelName(model?: string): string {
+  if (!model || model === "fallback") return "Gemini AI";
+  if (model === "gemini-flash-latest") return "Gemini Flash";
+  if (model.startsWith("gemini-")) {
+    return model
+      .replace(/^gemini-/, "Gemini ")
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+  return model;
+}
+
 export function Result() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
@@ -202,7 +215,7 @@ export function Result() {
     return matchesRole && matchesSearch;
   });
 
-  const modelDisplayName = evalData?.evalModel || "Gemini 2.5";
+  const modelDisplayName = formatModelName(evalData?.evalModel);
   const trackLabel = result.track ? (TRACK_LABELS[result.track] || result.track) : null;
   const levelLabel = result.experienceLevel ? (LEVEL_LABELS[result.experienceLevel] || result.experienceLevel) : null;
   const isBehavioral = result.track === "BEHAVIORAL";

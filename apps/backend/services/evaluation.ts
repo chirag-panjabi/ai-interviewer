@@ -43,7 +43,7 @@ export async function calculateResult(
 
   const userMessages = conversations.filter((c) => c.type === "User" && c.message.trim().length > 0);
 
-  // Handle empty or premature/abandoned interviews gracefully
+  // Handle completely empty interviews gracefully
   if (!conversations || conversations.length === 0 || userMessages.length === 0) {
     const emptyResult: EvaluationResult = {
       overallScore: 0,
@@ -64,37 +64,6 @@ export async function calculateResult(
       score: 0,
       feedback: emptyResult.summary,
       evaluationData: emptyResult,
-    };
-  }
-
-  // Handle truncated / ultra-short sessions (< 3 candidate answers)
-  if (userMessages.length < 3) {
-    const truncatedResult: EvaluationResult = {
-      overallScore: 2.5,
-      recommendation: "No Hire",
-      summary: `Interview session was truncated or ended prematurely after only ${userMessages.length} candidate response(s). Insufficient data was gathered to evaluate skills depth.`,
-      categories: {
-        technicalAccuracy: { score: 2.5, feedback: "Insufficient responses to gauge accuracy." },
-        problemSolving: { score: 2.5, feedback: "Session concluded before problem solving could be assessed." },
-        communication: { score: 3.5, feedback: "Brief participation recorded." },
-        depth: { score: 2.0, feedback: "Did not engage in deep technical trade-off discussions." },
-      },
-      strengths: [
-        "Connected to the interview session.",
-      ],
-      improvements: [
-        "Participate in full multi-question interview session to demonstrate problem-solving depth.",
-      ],
-      evidence: userMessages.slice(0, 2).map((m) => ({
-        quote: m.message,
-        assessment: "Brief answer recorded before interview was ended.",
-      })),
-    };
-
-    return {
-      score: truncatedResult.overallScore,
-      feedback: truncatedResult.summary,
-      evaluationData: truncatedResult,
     };
   }
 

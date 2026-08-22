@@ -316,7 +316,8 @@ ${transcriptHistory}
                     // Client temporarily disconnected while speech was incoming
                   }
                 }
-                if (part.text) {
+                // Only use part.text if outputTranscription is not provided by model
+                if (part.text && !serverContent.outputTranscription) {
                   currentAssistantTranscript += part.text;
                   try {
                     activeClientWs.send(
@@ -331,7 +332,7 @@ ${transcriptHistory}
               }
             }
 
-            // B. Streaming model output transcription
+            // B. Streaming model output transcription (authoritative for spoken audio)
             if (serverContent.outputTranscription?.text) {
               const text = serverContent.outputTranscription.text;
               currentAssistantTranscript += text;

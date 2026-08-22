@@ -33,6 +33,11 @@ function formatLiveModelName(model: string): string {
   return model.replace(/^gemini-/, "Gemini ").replace(/-/g, " ");
 }
 
+interface LiveCaption {
+  speaker: "assistant" | "user";
+  text: string;
+}
+
 export function Interview() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
@@ -44,7 +49,7 @@ export function Interview() {
   const [aiLevel, setAiLevel] = useState(0);
   const [userLevel, setUserLevel] = useState(0);
   const [activeModel, setActiveModel] = useState<string>("gemini-live-audio");
-  const [liveCaption, setLiveCaption] = useState<string>("");
+  const [liveCaption, setLiveCaption] = useState<LiveCaption | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   // Controls & Timer State
@@ -185,11 +190,17 @@ export function Interview() {
             setIsOffline(false);
           } else if (data.type === "audio" && data.pcm) {
             playerRef.current?.enqueueChunk(data.pcm);
+          } else if (data.type === "interrupt") {
+            playerRef.current?.interrupt();
+            setLiveCaption((prev) => (prev?.speaker === "assistant" ? { ...prev, text: prev.text + " [Interrupted]" } : prev));
           } else if (data.type === "transcript") {
             if (data.text) {
+              const incomingSpeaker = data.role === "user" ? "user" : "assistant";
               setLiveCaption((prev) => {
-                const prefix = data.role === "user" ? "You: " : "Alex: ";
-                return (prefix + data.text).slice(-200);
+                if (!prev || prev.speaker !== incomingSpeaker) {
+                  return { speaker: incomingSpeaker, text: data.text };
+                }
+                return { speaker: incomingSpeaker, text: (prev.text + data.text).slice(-300) };
               });
             }
           }
@@ -242,11 +253,15 @@ export function Interview() {
             player.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
             player.interrupt();
+            setLiveCaption((prev) => (prev?.speaker === "assistant" ? { ...prev, text: prev.text + " [Interrupted]" } : prev));
           } else if (data.type === "transcript") {
             if (data.text) {
+              const incomingSpeaker = data.role === "user" ? "user" : "assistant";
               setLiveCaption((prev) => {
-                const prefix = data.role === "user" ? "You: " : "Alex: ";
-                return (prefix + data.text).slice(-200);
+                if (!prev || prev.speaker !== incomingSpeaker) {
+                  return { speaker: incomingSpeaker, text: data.text };
+                }
+                return { speaker: incomingSpeaker, text: (prev.text + data.text).slice(-300) };
               });
             }
           } else if (data.type === "error") {
@@ -374,7 +389,16 @@ export function Interview() {
               {isTestingMic && (
                 <div className="space-y-2 pt-1">
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted/40"><div className="h-full bg-emerald-400 transition-all" style={{ width: `${Math.round(testVolume * 100)}%` }} /></div>
-                  <div className="text-[11px] text-muted-foreground">{micDetected ? "✅ Signal detected." : "Speak to test..."}</div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {micDetected ? (
+                      <>
+                        <CheckCircle2 className="size-3 text-emerald-400" />
+                        <span className="text-emerald-400 font-medium">Signal detected.</span>
+                      </>
+                    ) : (
+                      <span>Speak to test level...</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -390,7 +414,19 @@ export function Interview() {
               <VoiceOrb level={aiLevel} speaking={aiSpeaking} label="Alex (AI)" sublabel={aiSpeaking ? "Speaking" : "Listening"} icon={Bot} />
               <VoiceOrb level={isMuted ? 0 : userLevel} speaking={!isMuted && userSpeaking} label="You (Candidate)" sublabel={isMuted ? "Muted" : "Active"} icon={User} />
             </div>
-            {liveCaption && <div className="max-w-lg rounded-xl border border-border/60 bg-card/50 px-5 py-3 text-center text-xs italic font-mono text-foreground/90">"{liveCaption}"</div>}
+            {liveCaption && liveCaption.text && (
+              <div className="max-w-xl rounded-xl border border-border/60 bg-card/60 px-5 py-3 text-center text-xs text-foreground/90 backdrop-blur shadow-sm animate-in fade-in duration-150 space-y-1">
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="flex size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-mono text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {liveCaption.speaker === "user" ? "Candidate (You)" : "Alex (Interviewer)"}
+                  </span>
+                </div>
+                <p className="italic font-mono text-xs leading-relaxed text-foreground">
+                  "{liveCaption.text}"
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -411,3 +447,4 @@ export function Interview() {
     </main>
   );
 }
+

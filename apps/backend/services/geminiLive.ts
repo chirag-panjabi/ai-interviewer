@@ -323,6 +323,23 @@ ${transcriptHistory}
               try {
                 activeClientWs.send(JSON.stringify({ type: "interrupt" }));
               } catch (e) {}
+
+              if (currentAssistantTranscript.trim()) {
+                const interruptedText = currentAssistantTranscript.trim();
+                currentAssistantTranscript = "";
+                console.log(`[GeminiLive] Interrupted assistant turn saved: "${interruptedText}"`);
+                try {
+                  await prisma.message.create({
+                    data: {
+                      interviewId,
+                      type: "Assistant",
+                      message: interruptedText,
+                    },
+                  });
+                } catch (e) {
+                  console.error("Error saving interrupted assistant message:", e);
+                }
+              }
             }
 
             // E. Model Turn Complete

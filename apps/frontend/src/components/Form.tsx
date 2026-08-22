@@ -442,7 +442,7 @@ export function Form() {
                       disabled={loading}
                       onClick={() => setExperienceLevel(lvl.id)}
                       className={cn(
-                        "flex flex-col justify-between rounded-xl border p-3 text-left transition-all cursor-pointer",
+                        "flex flex-col justify-between rounded-xl border p-3 text-left transition-colors duration-150 cursor-pointer",
                         isSelected
                           ? "border-primary bg-primary/10 shadow-sm"
                           : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
@@ -457,7 +457,7 @@ export function Form() {
                           <Check className="size-3 text-primary stroke-[3]" />
                         )}
                       </div>
-                      <span className="mt-1 text-[10px] text-muted-foreground">
+                      <span className="mt-1 text-[11px] text-muted-foreground">
                         {lvl.sublabel}
                       </span>
                     </button>
@@ -488,7 +488,7 @@ export function Form() {
                       disabled={loading}
                       onClick={() => setTrack(t.id)}
                       className={cn(
-                        "flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer",
+                        "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors duration-150 cursor-pointer",
                         isSelected
                           ? "border-primary bg-primary/10 shadow-sm"
                           : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
@@ -514,7 +514,7 @@ export function Form() {
                             <Check className="size-3 text-primary stroke-[3] shrink-0 ml-1" />
                           )}
                         </div>
-                        <p className="mt-0.5 text-[10px] text-muted-foreground line-clamp-1">
+                        <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">
                           {t.description}
                         </p>
                       </div>
@@ -550,6 +550,7 @@ export function Form() {
                 </div>
                 <Input
                   value={github}
+                  aria-label="GitHub username or repository URL"
                   placeholder="github.com/username or repo link"
                   onChange={(e) => handleGithubChange(e.target.value)}
                   onBlur={() => triggerPreviewFetch(github)}
@@ -562,8 +563,9 @@ export function Form() {
                     type="button"
                     onClick={() => triggerPreviewFetch(github)}
                     disabled={fetchingPreview || loading}
+                    aria-label="Scan GitHub repositories"
                     title="Scan repositories"
-                    className="p-1 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors mr-0.5"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors mr-0.5 cursor-pointer"
                   >
                     {fetchingPreview ? (
                       <Loader2 className="size-3.5 animate-spin text-primary" />
@@ -630,7 +632,7 @@ export function Form() {
                         setSelectedRepo(null);
                       }}
                       className={cn(
-                        "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
+                        "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors duration-150 cursor-pointer",
                         isGeneralDomainOnly
                           ? "border-primary bg-primary/10 shadow-sm"
                           : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
@@ -647,7 +649,7 @@ export function Form() {
                             <Check className="size-3 text-primary stroke-[3]" />
                           )}
                         </div>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           Skip project specifics; evaluate core track concepts directly
                         </p>
                       </div>
@@ -667,7 +669,7 @@ export function Form() {
                               setIsCustomMode(false);
                             }}
                             className={cn(
-                              "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
+                              "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors duration-150 cursor-pointer",
                               isSelected
                                 ? "border-primary bg-primary/10 shadow-sm"
                                 : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
@@ -692,7 +694,7 @@ export function Form() {
                                   )}
                                 </div>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                                 {r.language && (
                                   <span className="font-medium text-foreground/80">
                                     {r.language}
@@ -716,7 +718,7 @@ export function Form() {
                         setSelectedRepo(null);
                       }}
                       className={cn(
-                        "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer",
+                        "w-full flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors duration-150 cursor-pointer",
                         isCustomMode
                           ? "border-primary bg-primary/10 shadow-sm"
                           : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
@@ -733,7 +735,7 @@ export function Form() {
                             <Check className="size-3 text-primary stroke-[3]" />
                           )}
                         </div>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           Specify any private or public repository name
                         </p>
                       </div>
@@ -746,6 +748,7 @@ export function Form() {
                         </span>
                         <Input
                           value={customRepoInput}
+                          aria-label="Custom repository name"
                           placeholder="e.g. distributed-kv or ai-interviewer"
                           onChange={(e) => setCustomRepoInput(e.target.value)}
                           disabled={loading}

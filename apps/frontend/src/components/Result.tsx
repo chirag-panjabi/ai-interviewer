@@ -95,6 +95,7 @@ export function Result() {
     status: "EVALUATING",
   });
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Transcript Search & Filtering
@@ -105,17 +106,29 @@ export function Result() {
     let intervalId: any = null;
 
     const fetchResult = async () => {
+      if (!interviewId) {
+        setFetchError("No interview ID provided in URL.");
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`);
         const data = response.data;
         setResult(data);
+        setFetchError(null);
 
         if (data.status === "COMPLETED" || data.status === "Done") {
           setLoading(false);
           if (intervalId) clearInterval(intervalId);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching results:", err);
+        if (err?.response?.status === 404) {
+          setFetchError("This interview session was not found or has expired.");
+          setLoading(false);
+          if (intervalId) clearInterval(intervalId);
+        }
       }
     };
 
@@ -168,12 +181,13 @@ export function Result() {
 
   const recBadge = getRecommendationBadge(evalData?.recommendation);
 
-  // Filtered transcript messages
-  const filteredTranscript = result.transcript.filter((m) => {
+  // Filtered transcript messages with safe array fallback
+  const transcriptList = Array.isArray(result?.transcript) ? result.transcript : [];
+  const filteredTranscript = transcriptList.filter((m) => {
     const matchesRole = roleFilter === "all" || m.type === roleFilter;
     const matchesSearch =
       searchQuery.trim() === "" ||
-      m.content.toLowerCase().includes(searchQuery.toLowerCase().trim());
+      (m.content || "").toLowerCase().includes(searchQuery.toLowerCase().trim());
     return matchesRole && matchesSearch;
   });
 
@@ -244,7 +258,22 @@ export function Result() {
         </div>
       </header>
 
-      {!ready ? (
+      {fetchError ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-destructive/40 bg-card/40 py-20 text-center backdrop-blur">
+          <div className="grid size-12 place-items-center rounded-xl bg-destructive/15 text-destructive">
+            <AlertTriangle className="size-6" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-foreground">Interview Record Not Found</p>
+            <p className="mt-1 max-w-md text-xs text-muted-foreground">
+              {fetchError}
+            </p>
+          </div>
+          <Button onClick={() => navigate("/")} variant="outline" size="sm" className="mt-2">
+            Return to Setup
+          </Button>
+        </div>
+      ) : !ready ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-card/40 py-28 text-center backdrop-blur">
           <div className="grid size-14 place-items-center rounded-2xl bg-secondary/80 text-violet-400">
             <Loader2 className="size-7 animate-spin" />

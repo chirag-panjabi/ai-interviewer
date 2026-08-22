@@ -178,6 +178,9 @@ export function Form() {
   ];
 
   useEffect(() => {
+    // Proactively warm up backend if Render is sleeping
+    axios.get(`${BACKEND_URL}/health`, { timeout: 10000 }).catch(() => {});
+
     return () => {
       timersRef.current.forEach(clearTimeout);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -223,7 +226,7 @@ export function Form() {
       const res = await axios.post(
         `${BACKEND_URL}/api/v1/github-preview`,
         { github: inputVal.trim() },
-        { signal: controller.signal }
+        { signal: controller.signal, timeout: 25000 }
       );
 
       const previewData: ProfilePreview = res.data;
@@ -310,12 +313,16 @@ export function Form() {
     }
 
     try {
-      const response = await axios.post(`${BACKEND_URL}/api/v1/pre-interview`, {
-        github: github.trim(),
-        experienceLevel,
-        track,
-        selectedRepo: finalSelectedRepo,
-      });
+      const response = await axios.post(
+        `${BACKEND_URL}/api/v1/pre-interview`,
+        {
+          github: github.trim(),
+          experienceLevel,
+          track,
+          selectedRepo: finalSelectedRepo,
+        },
+        { timeout: 35000 }
+      );
       tryNavigate(response.data.id);
     } catch (e: any) {
       timersRef.current.forEach(clearTimeout);

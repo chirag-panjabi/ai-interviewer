@@ -187,6 +187,27 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
 
     console.error(`[GitHubPreview] API error for ${username} (HTTP ${status || "unknown"}): ${msg}`);
 
+    // If local development environment suffers an ISP/network TLS reset (e.g. SSL_ERROR_SYSCALL or unknown cert error)
+    if (
+      process.env.NODE_ENV !== "production" &&
+      (!status || status >= 500 || String(msg).includes("certificate") || String(msg).includes("SSL") || String(msg).includes("ECONNRESET") || String(msg).includes("syscall"))
+    ) {
+      try {
+        console.log(`[GitHubPreview] Local network TLS reset detected. Fetching via upstream cloud proxy for ${username}...`);
+        const cloudRes = await axios.post(
+          "https://ai-interviewer-backend-6jio.onrender.com/api/v1/github-preview",
+          { github: username },
+          { timeout: 10000 }
+        );
+        if (cloudRes.data && Array.isArray(cloudRes.data.repos) && cloudRes.data.repos.length > 0) {
+          previewCache.set(cacheKey, { timestamp: now, data: cloudRes.data });
+          return cloudRes.data;
+        }
+      } catch {
+        // continue to normal fallback
+      }
+    }
+
     // If a specific repo was supplied in URL, preserve it in fallback preview
     const fallbackRepos: GithubRepoPreview[] = [];
     if (repoName) {

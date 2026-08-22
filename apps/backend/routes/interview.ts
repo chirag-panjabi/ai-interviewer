@@ -150,12 +150,14 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       data: { status: "EVALUATING" },
     });
 
-    // Run evaluation with Gemini 3.7 Flash, tailored to level & track
+    // Run evaluation with Gemini, tailored to level & track (using custom key if provided)
+    const customApiKey = (req.headers["x-gemini-api-key"] || req.headers["x-api-key"]) as string | undefined;
     const result = await calculateResult(
       interview.conversations,
       interview.githubMetadata,
       interview.experienceLevel,
-      interview.track
+      interview.track,
+      customApiKey
     );
 
     // Save final structured evaluation

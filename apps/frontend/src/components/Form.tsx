@@ -26,10 +26,12 @@ import {
   Code,
   FolderGit2,
   Plus,
-  AlertCircle,
   RefreshCw,
+  Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ApiKeyModal } from "./ApiKeyModal";
+import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "@/lib/apiKeyStorage";
 
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
 
@@ -152,6 +154,10 @@ export function Form() {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
+  // BYOK Settings State
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [customKeyActive, setCustomKeyActive] = useState(() => hasCustomApiKey());
+
   // GitHub Preview and Selected Repo State
   const [profilePreview, setProfilePreview] = useState<ProfilePreview | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false);
@@ -180,6 +186,28 @@ export function Form() {
   useEffect(() => {
     // Proactively warm up backend if Render is sleeping
     axios.get(`${BACKEND_URL}/health`, { timeout: 10000 }).catch(() => {});
+
+    // Parse URL query parameters (e.g. ?user=chirag-panjabi or ?github=...&track=...&level=...)
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlUser = searchParams.get("user") || searchParams.get("github") || searchParams.get("username");
+      const urlTrack = searchParams.get("track");
+      const urlLevel = searchParams.get("level") || searchParams.get("exp");
+
+      if (urlTrack && TRACKS.some((t) => t.id === urlTrack)) {
+        setTrack(urlTrack as InterviewTrack);
+      }
+      if (urlLevel && EXPERIENCE_LEVELS.some((l) => l.id === urlLevel.toUpperCase())) {
+        setExperienceLevel(urlLevel.toUpperCase() as ExperienceLevel);
+      }
+      if (urlUser && urlUser.trim()) {
+        const cleanUser = urlUser.trim();
+        setGithub(cleanUser);
+        triggerPreviewFetch(cleanUser);
+      }
+    } catch {
+      // ignore
+    }
 
     return () => {
       timersRef.current.forEach(clearTimeout);
@@ -312,6 +340,8 @@ export function Form() {
       }
     }
 
+    const customKey = getCustomApiKey();
+
     try {
       const response = await axios.post(
         `${BACKEND_URL}/api/v1/pre-interview`,
@@ -321,24 +351,61 @@ export function Form() {
           track,
           selectedRepo: finalSelectedRepo,
         },
-        { timeout: 35000 }
+        {
+          timeout: 35000,
+          headers: customKey ? { "x-gemini-api-key": customKey } : {},
+        }
       );
       tryNavigate(response.data.id);
     } catch (e: any) {
       timersRef.current.forEach(clearTimeout);
-      toast.error(e?.response?.data?.message || "Something went wrong starting your interview. Please try again.");
       setLoading(false);
       setCurrentStep(0);
+
+      if (e?.response?.status === 429) {
+        toast.error("Daily demo limit reached for this IP. Enter your free Gemini key to continue practicing!");
+        setIsApiKeyModalOpen(true);
+        return;
+      }
+
+      toast.error(e?.response?.data?.message || "Something went wrong starting your interview. Please try again.");
     }
   }
 
   return (
     <main className="flex min-h-screen w-screen items-center justify-center overflow-y-auto px-4 py-10 sm:px-6">
       <div className="flex w-full max-w-2xl flex-col items-center text-center">
-        <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-          <Mic className="size-3.5 text-primary" />
-          Live Voice Technical Screening
-        </span>
+        {/* Top Header Navigation & Status Bar */}
+        <div className="mb-5 flex w-full items-center justify-between">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+            <Mic className="size-3.5 text-primary" />
+            Live Voice Technical Screening
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setIsApiKeyModalOpen(true)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium backdrop-blur transition-all",
+              customKeyActive
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 shadow-sm"
+                : "border-border/80 bg-card/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
+            title="Configure custom Gemini API key for unlimited practice"
+          >
+            {customKeyActive ? (
+              <>
+                <Sparkles className="size-3 text-emerald-400" />
+                <span>BYOK Active <span className="text-[10px] opacity-75 font-mono">({maskApiKey(getCustomApiKey())})</span></span>
+              </>
+            ) : (
+              <>
+                <Key className="size-3 text-primary" />
+                <span>Gemini Key <span className="text-muted-foreground/70 font-normal">(Optional)</span></span>
+              </>
+            )}
+          </button>
+        </div>
 
         <h1 className="bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-5xl">
           AI Technical Interviewer
@@ -741,6 +808,12 @@ export function Form() {
           )}
         </div>
       </div>
+
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onKeyChange={(hasKey) => setCustomKeyActive(hasKey)}
+      />
     </main>
   );
 }

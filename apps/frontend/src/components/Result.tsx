@@ -1,4 +1,5 @@
 import { BACKEND_URL } from "@/lib/config";
+import { getCustomApiKey } from "@/lib/apiKeyStorage";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -113,7 +114,10 @@ export function Result() {
       }
 
       try {
-        const response = await axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`);
+        const customKey = getCustomApiKey();
+        const response = await axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`, {
+          headers: customKey ? { "x-gemini-api-key": customKey } : {},
+        });
         const data = response.data;
         setResult(data);
         setFetchError(null);

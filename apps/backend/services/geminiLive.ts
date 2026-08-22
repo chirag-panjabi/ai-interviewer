@@ -4,8 +4,15 @@ import { config } from "../config";
 import { buildSystemPrompt } from "./promptBuilder";
 
 interface ClientMessage {
-  type: "audio" | "end" | "ping";
+  type: "audio" | "end" | "ping" | "auth";
   pcm?: string; // Base64-encoded 16kHz mono 16-bit PCM
+  apiKey?: string; // Optional custom BYOK key
+}
+
+function maskKey(key?: string): string {
+  if (!key) return "hosted-default";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
 interface ActiveSession {
@@ -24,7 +31,7 @@ interface ActiveSession {
 
 const activeSessions = new Map<string, ActiveSession>();
 
-export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
+export function handleGeminiLiveSession(clientWs: any, interviewId: string, customApiKey?: string) {
   // Check if an existing session is still in grace period for this interviewId
   const existingSession = activeSessions.get(interviewId);
   if (existingSession && existingSession.isSessionActive && existingSession.geminiWs?.readyState === WsClient.OPEN) {
@@ -213,10 +220,15 @@ ${transcriptHistory}
         console.log(`[GeminiLive] Injected ${existingMessages.length} prior conversation turns into system prompt for resilient resumption (${interviewId}).`);
       }
 
-      const host = "generativelanguage.googleapis.com";
-      const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${config.GEMINI_API_KEY}`;
+      const activeApiKey = customApiKey?.trim() || config.GEMINI_API_KEY;
+      if (!activeApiKey) {
+        throw new Error("No Gemini API key available for live audio session.");
+      }
 
-      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Track: ${interview.track}, Level: ${interview.experienceLevel}, Resuming: ${isResumingSession}]`);
+      const host = "generativelanguage.googleapis.com";
+      const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${activeApiKey}`;
+
+      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Track: ${interview.track}, Level: ${interview.experienceLevel}, Key: ${maskKey(activeApiKey)}, Resuming: ${isResumingSession}]`);
       geminiWs = new WsClient(uri);
       sessionObj.geminiWs = geminiWs;
 

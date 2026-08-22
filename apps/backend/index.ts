@@ -101,19 +101,24 @@ server.on("upgrade", (request, socket, head) => {
   // Match /api/v1/live/:interviewId or /api/v1/live?interviewId=...
   const match = pathname.match(/^\/api\/v1\/live\/([^/]+)$/);
   const interviewId = match ? match[1] : url.searchParams.get("interviewId");
+  const customApiKey =
+    (request.headers["x-gemini-api-key"] as string) ||
+    (request.headers["x-api-key"] as string) ||
+    url.searchParams.get("apiKey") ||
+    undefined;
 
   if (interviewId) {
     wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request, interviewId);
+      wss.emit("connection", ws, request, interviewId, customApiKey);
     });
   } else {
     socket.destroy();
   }
 });
 
-wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, interviewId: string) => {
+wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, interviewId: string, customApiKey?: string) => {
   console.log(`[WebSocket] Client connected for live interview: ${interviewId}`);
-  handleGeminiLiveSession(ws, interviewId);
+  handleGeminiLiveSession(ws, interviewId, customApiKey);
 });
 
 server.listen(config.PORT, () => {

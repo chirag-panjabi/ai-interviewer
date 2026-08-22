@@ -35,10 +35,12 @@ export async function calculateResult(
   conversations: Array<{ type: string; message: string; createdAt?: Date }>,
   githubMetadata?: any,
   experienceLevel: string = "MID",
-  track: string = "FULLSTACK_GENERAL"
+  track: string = "FULLSTACK_GENERAL",
+  customApiKey?: string
 ): Promise<{ score: number; feedback: string; evaluationData: EvaluationResult }> {
-  if (!config.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured in backend environment.");
+  const activeKey = customApiKey?.trim() || config.GEMINI_API_KEY;
+  if (!activeKey) {
+    throw new Error("No Gemini API key available for evaluation.");
   }
 
   const userMessages = conversations.filter((c) => c.type === "User" && c.message.trim().length > 0);
@@ -90,7 +92,7 @@ export async function calculateResult(
   let lastError: any = null;
 
   for (const modelName of candidateModels) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${config.GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`;
 
     try {
       console.log(`[Evaluation] Evaluating with model: ${modelName}...`);

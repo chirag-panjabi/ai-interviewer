@@ -1,3 +1,5 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Security-Dialog · theme: custom-carbon · states: default · verifying · error · byok-active · demo-active */
+
 import React, { useState, useEffect } from "react";
 import {
   Key,
@@ -7,11 +9,12 @@ import {
   EyeOff,
   Trash2,
   CheckCircle2,
-  Sparkles,
   X,
   Server,
   AlertCircle,
   Loader2,
+  Lock,
+  Zap,
 } from "lucide-react";
 import {
   getCustomApiKey,
@@ -21,6 +24,7 @@ import {
   verifyGeminiApiKey,
 } from "../lib/apiKeyStorage";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -45,6 +49,17 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
     }
   }, [isOpen]);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !isVerifying) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isVerifying, onClose]);
+
   if (!isOpen) return null;
 
   async function handleSave() {
@@ -52,7 +67,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
     if (!trimmed) {
       removeCustomApiKey();
       setExistingKey(null);
-      toast.info("Switched to Hosted Demo tier");
+      toast.info("Active tier: Hosted Cloud Demo");
       onKeyChange?.(false);
       onClose();
       return;
@@ -64,18 +79,18 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
     try {
       const { isValid, error: verificationError } = await verifyGeminiApiKey(trimmed);
       if (!isValid) {
-        setError(verificationError || "Google rejected this API key.");
+        setError(verificationError || "Google Gemini API rejected this key.");
         setIsVerifying(false);
         return;
       }
 
       setCustomApiKey(trimmed);
       setExistingKey(trimmed);
-      toast.success("✨ Gemini API Key verified & activated! Unlimited practice mode enabled.");
+      toast.success("Gemini API Key verified. Unlimited practice mode activated.");
       onKeyChange?.(true);
       onClose();
     } catch {
-      setError("Could not complete key verification. Please check your connection.");
+      setError("Could not reach Google verification endpoint. Check your network connection.");
     } finally {
       setIsVerifying(false);
     }
@@ -86,80 +101,109 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
     setExistingKey(null);
     setApiKeyInput("");
     setError(null);
-    toast.info("Custom key removed. Reverted to Hosted Cloud Demo tier.");
+    toast.info("Custom key cleared. Active tier: Hosted Cloud Demo.");
     onKeyChange?.(false);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="api-modal-title"
+    >
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-card/95 p-6 shadow-2xl backdrop-blur-xl animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-card p-6 shadow-2xl text-left animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/40 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        {/* Header Rail */}
+        <div className="flex items-start justify-between border-b border-border/40 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-9 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shrink-0">
               <Key className="size-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-foreground">Runtime & Model Settings</h3>
-              <p className="text-xs text-muted-foreground">Manage Gemini API quota & access tier</p>
+              <h2 id="api-modal-title" className="text-base font-semibold text-foreground">
+                Gemini API Configuration
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Manage practice quota & bring-your-own-key (BYOK) settings
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+            aria-label="Close dialog"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors duration-150 cursor-pointer"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* Current Tier Status Banner */}
-        <div className="mt-4 rounded-xl border border-border/50 bg-background/50 p-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              {existingKey ? (
-                <div className="grid size-7 place-items-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                  <Sparkles className="size-3.5" />
-                </div>
-              ) : (
-                <div className="grid size-7 place-items-center rounded-lg bg-blue-500/10 text-blue-400">
-                  <Server className="size-3.5" />
-                </div>
+        {/* 2-Tier Segmented Comparison */}
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+          <div
+            className={cn(
+              "rounded-xl border p-3 transition-colors duration-150 space-y-1.5",
+              !existingKey
+                ? "border-primary bg-primary/10"
+                : "border-border/60 bg-background/50 opacity-60"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <Server className="size-3.5 text-primary" />
+                Hosted Demo
+              </span>
+              {!existingKey && (
+                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-semibold">
+                  Active
+                </span>
               )}
-              <div>
-                <div className="text-xs font-semibold text-foreground">
-                  {existingKey ? "Custom API Key Active (BYOK)" : "Hosted Cloud Demo Active"}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {existingKey
-                    ? `Using key: ${maskApiKey(existingKey)} (Unlimited Practice)`
-                    : "Zero setup required (Recruiter 1-click evaluation)"}
-                </div>
-              </div>
             </div>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                existingKey
-                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                  : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-              }`}
-            >
-              {existingKey ? "Unlimited" : "Demo Tier"}
-            </span>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Shared demo pool. 1-click evaluation without personal credentials.
+            </p>
+          </div>
+
+          <div
+            className={cn(
+              "rounded-xl border p-3 transition-colors duration-150 space-y-1.5",
+              existingKey
+                ? "border-emerald-500/50 bg-emerald-500/10"
+                : "border-border/60 bg-background/50"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className={cn("size-3.5", existingKey ? "text-emerald-400" : "text-muted-foreground")} />
+                BYOK (Custom)
+              </span>
+              {existingKey ? (
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold">
+                  Active
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-muted-foreground">Unlimited</span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Use your free Gemini key for unlimited high-frequency voice practice.
+            </p>
           </div>
         </div>
 
-        {/* Form Body */}
+        {/* Input Form Body */}
         <div className="mt-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-foreground mb-1.5">
-              Google Gemini API Key (Optional)
+            <label htmlFor="gemini-api-key-input" className="block text-xs font-semibold text-foreground mb-1.5">
+              Google Gemini API Key
             </label>
             <div className="relative">
               <input
+                id="gemini-api-key-input"
                 type={showKey ? "text" : "password"}
                 value={apiKeyInput}
                 onChange={(e) => {
@@ -167,34 +211,37 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
                   if (error) setError(null);
                 }}
                 placeholder="AIzaSy..."
-                className={`w-full rounded-xl border ${
-                  error ? "border-destructive/80" : "border-border/80"
-                } bg-background/80 px-3.5 py-2.5 pr-10 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors font-mono`}
+                className={cn(
+                  "w-full rounded-xl border bg-background/80 px-3.5 py-2.5 pr-10 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors duration-150 font-mono",
+                  error
+                    ? "border-destructive ring-1 ring-destructive/30"
+                    : "border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/40"
+                )}
               />
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                title={showKey ? "Hide API key" : "Show API key"}
+                aria-label={showKey ? "Hide API key" : "Show API key"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150 cursor-pointer"
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
             {error && (
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-destructive">
-                <AlertCircle className="size-3" />
-                {error}
+              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-destructive font-medium">
+                <AlertCircle className="size-3 shrink-0" />
+                <span>{error}</span>
               </p>
             )}
           </div>
 
-          {/* Links & Info */}
-          <div className="flex items-center justify-between text-[11px]">
+          {/* Quick Helper Links */}
+          <div className="flex items-center justify-between text-xs pt-0.5">
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium"
             >
               Get free key from Google AI Studio
               <ExternalLink className="size-3" />
@@ -203,7 +250,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
               <button
                 type="button"
                 onClick={handleRemove}
-                className="inline-flex items-center gap-1 text-destructive hover:underline"
+                className="inline-flex items-center gap-1 text-destructive hover:underline text-[11px] font-medium cursor-pointer"
               >
                 <Trash2 className="size-3" />
                 Remove custom key
@@ -211,14 +258,14 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
             )}
           </div>
 
-          {/* Privacy Note */}
-          <div className="rounded-xl border border-border/40 bg-card/40 p-3 text-[11px] text-muted-foreground space-y-1">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <ShieldCheck className="size-3.5 text-emerald-400" />
-              Privacy & Zero-Persistence Guarantee
+          {/* Security & Zero-Persistence Guarantee */}
+          <div className="rounded-xl border border-border/40 bg-background/40 p-3 text-xs text-muted-foreground space-y-1">
+            <div className="flex items-center gap-1.5 font-medium text-foreground text-[11px]">
+              <Lock className="size-3 text-emerald-400" />
+              <span>Zero-Persistence Guarantee</span>
             </div>
-            <p className="text-[10px] leading-relaxed">
-              Your API key is stored <strong>only in your browser's localStorage</strong>. It is transmitted securely over TLS to power your live voice session and is <strong>never persisted to our database</strong> or logged to disk.
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              Your API key is saved exclusively in your browser's <code className="text-foreground font-mono">localStorage</code>. It is never logged or stored on our servers.
             </p>
           </div>
         </div>
@@ -228,7 +275,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-border/80 bg-background/60 px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+            className="rounded-xl border border-border/80 bg-background/60 px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors duration-150 cursor-pointer"
           >
             Cancel
           </button>
@@ -236,17 +283,17 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
             type="button"
             disabled={isVerifying}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60 transition-all cursor-pointer disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60 transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed"
           >
             {isVerifying ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
-                Verifying with Google...
+                Verifying with Google…
               </>
             ) : (
               <>
                 <CheckCircle2 className="size-3.5" />
-                Save & Apply
+                Save & Activate
               </>
             )}
           </button>
@@ -255,3 +302,4 @@ export function ApiKeyModal({ isOpen, onClose, onKeyChange }: ApiKeyModalProps) 
     </div>
   );
 }
+

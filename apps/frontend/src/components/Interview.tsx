@@ -14,6 +14,8 @@ export function Interview() {
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<Status>("idle");
+  const statusRef = useRef<Status>("idle");
+  statusRef.current = status;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiLevel, setAiLevel] = useState(0);
   const [userLevel, setUserLevel] = useState(0);
@@ -244,7 +246,7 @@ export function Interview() {
       };
 
       socket.onclose = () => {
-        if (!isEndingRef.current && status !== "error") {
+        if (!isEndingRef.current && statusRef.current === "reconnecting") {
           const delay = Math.min(8000, 1500 * Math.pow(1.25, attempt - 1)) + Math.random() * 400;
           reconnectTimeoutRef.current = setTimeout(() => {
             attemptReconnect(attempt + 1);
@@ -345,13 +347,13 @@ export function Interview() {
 
       socket.onerror = (err) => {
         console.error("[Interview] WebSocket error:", err);
-        if (!isEndingRef.current) {
+        if (!isEndingRef.current && statusRef.current !== "error") {
           attemptReconnect(1);
         }
       };
 
       socket.onclose = () => {
-        if (!isEndingRef.current && status === "live") {
+        if (!isEndingRef.current && (statusRef.current === "live" || statusRef.current === "connecting")) {
           console.log("[Interview] Connection dropped unexpectedly. Initiating auto-reconnect...");
           attemptReconnect(1);
         }
@@ -378,7 +380,7 @@ export function Interview() {
     const handleOnline = () => {
       console.log("[Interview] Browser online event fired. Triggering immediate reconnect...");
       setIsOffline(false);
-      if (status === "reconnecting" || status === "live") {
+      if (statusRef.current === "reconnecting" || statusRef.current === "live") {
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = null;
@@ -390,7 +392,7 @@ export function Interview() {
     const handleOffline = () => {
       console.log("[Interview] Browser offline event fired.");
       setIsOffline(true);
-      if (status === "live") {
+      if (statusRef.current === "live") {
         setStatus("reconnecting");
       }
     };
@@ -403,7 +405,7 @@ export function Interview() {
       window.removeEventListener("offline", handleOffline);
       cleanup();
     };
-  }, [status]);
+  }, []);
 
   function cleanup() {
     if (reconnectTimeoutRef.current) {
@@ -513,7 +515,7 @@ export function Interview() {
               : status === "connecting"
               ? "Connecting to Gemini Live…"
               : status === "reconnecting"
-              ? `Reconnecting (${reconnectAttempt}/10)…`
+              ? `Reconnecting (${reconnectAttempt}/15)…`
               : status === "ending"
               ? "Generating Evaluation…"
               : status === "error"

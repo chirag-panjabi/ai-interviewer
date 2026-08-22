@@ -7,7 +7,7 @@ import { getBackendWsUrl } from "@/lib/config";
 import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
 import { cn } from "@/lib/utils";
 
-type Status = "idle" | "connecting" | "live" | "ending" | "error";
+type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "error";
 
 export function Interview() {
   const { interviewId } = useParams();
@@ -19,6 +19,7 @@ export function Interview() {
   const [userLevel, setUserLevel] = useState(0);
   const [activeModel, setActiveModel] = useState<string>("gemini-3.1-flash-live-preview");
   const [liveCaption, setLiveCaption] = useState<string>("");
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   // Controls & Timer State
   const [isMuted, setIsMuted] = useState(false);
@@ -26,6 +27,8 @@ export function Interview() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const callStartTimeRef = useRef<number>(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isEndingRef = useRef(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pre-join Mic Test State
   const [isTestingMic, setIsTestingMic] = useState(false);
@@ -116,6 +119,94 @@ export function Interview() {
     setTestVolume(0);
   };
 
+  // Auto-reconnect loop (up to 10 attempts / 30 seconds)
+  const attemptReconnect = (attempt = 1) => {
+    if (isEndingRef.current || !interviewId) return;
+
+    if (attempt > 10) {
+      setStatus("error");
+      setErrorMessage("Network connection lost. Please check your internet connection and refresh.");
+      return;
+    }
+
+    setStatus("reconnecting");
+    setReconnectAttempt(attempt);
+
+    const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
+    console.log(`[Interview] Attempting auto-reconnect (${attempt}/10) to ${wsUrl}...`);
+
+    try {
+      const socket = new WebSocket(wsUrl);
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        console.log(`[Interview] Auto-reconnected to backend on attempt ${attempt}`);
+      };
+
+      socket.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "ready" || data.type === "reconnected") {
+            if (data.model) setActiveModel(data.model);
+
+            if (playerRef.current) {
+              await playerRef.current.resume();
+            }
+
+            // Resume audio recording
+            if (!recorderRef.current) {
+              const recorder = new LiveMicrophoneRecorder((pcm) => {
+                if (socket.readyState === WebSocket.OPEN && !isMutedRef.current) {
+                  socket.send(JSON.stringify({ type: "audio", pcm }));
+                }
+              });
+              await recorder.start();
+              recorderRef.current = recorder;
+            }
+
+            setStatus("live");
+            setReconnectAttempt(0);
+          } else if (data.type === "audio" && data.pcm) {
+            playerRef.current?.enqueueChunk(data.pcm);
+          } else if (data.type === "interrupt") {
+            playerRef.current?.interrupt();
+          } else if (data.type === "transcript") {
+            if (data.text) {
+              setLiveCaption((prev) => {
+                const prefix = data.role === "user" ? "You: " : "Alex: ";
+                if (prev.startsWith(prefix)) {
+                  return (prev + data.text).slice(-200);
+                }
+                return (prefix + data.text).slice(-200);
+              });
+            }
+          } else if (data.type === "error") {
+            console.error("[Interview] Reconnect error from backend:", data.message);
+          }
+        } catch (e) {
+          console.error("[Interview] Error parsing reconnect WS message:", e);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!isEndingRef.current && status !== "error") {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            attemptReconnect(attempt + 1);
+          }, 2500);
+        }
+      };
+
+      socket.onerror = () => {
+        // Handled by onclose retry
+      };
+    } catch (e) {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        attemptReconnect(attempt + 1);
+      }, 2500);
+    }
+  };
+
   // Initialize and start interview explicitly from user click
   const joinInterview = async () => {
     if (!interviewId) {
@@ -124,20 +215,18 @@ export function Interview() {
       return;
     }
 
-    // Stop mic test analysis loop but keep media stream if active for reuse
     const reusableStream = testStreamRef.current;
     stopMicTest(true);
 
     setStatus("connecting");
     setErrorMessage(null);
+    setReconnectAttempt(0);
 
     try {
-      // 1. Create and warm up audio player directly in the user click gesture
       const player = new LiveAudioPlayer();
       player.warmUp();
       playerRef.current = player;
 
-      // 2. Open WebSocket
       const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
@@ -150,12 +239,11 @@ export function Interview() {
         try {
           const data = JSON.parse(event.data);
 
-          if (data.type === "ready") {
+          if (data.type === "ready" || data.type === "reconnected") {
             if (data.model) setActiveModel(data.model);
 
             await player.resume();
 
-            // 3. Request and activate microphone (reusing test stream if available)
             const recorder = new LiveMicrophoneRecorder((pcm) => {
               if (socket.readyState === WebSocket.OPEN && !isMutedRef.current) {
                 socket.send(JSON.stringify({ type: "audio", pcm }));
@@ -166,10 +254,11 @@ export function Interview() {
             recorderRef.current = recorder;
 
             setStatus("live");
-            callStartTimeRef.current = Date.now();
-            setElapsedSeconds(0);
+            if (callStartTimeRef.current === 0) {
+              callStartTimeRef.current = Date.now();
+              setElapsedSeconds(0);
+            }
 
-            // Start Live Call Timer
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             timerIntervalRef.current = setInterval(() => {
               const sec = Math.floor((Date.now() - callStartTimeRef.current) / 1000);
@@ -203,15 +292,18 @@ export function Interview() {
 
       socket.onerror = (err) => {
         console.error("[Interview] WebSocket error:", err);
-        setStatus("error");
-        setErrorMessage("Failed to connect to the live interview server.");
+        if (!isEndingRef.current) {
+          attemptReconnect(1);
+        }
       };
 
       socket.onclose = () => {
-        console.log("[Interview] WebSocket closed");
+        if (!isEndingRef.current && status === "live") {
+          console.log("[Interview] Connection dropped unexpectedly. Initiating auto-reconnect...");
+          attemptReconnect(1);
+        }
       };
 
-      // 4. Start visualizer animation loop
       const tick = () => {
         if (playerRef.current) {
           setAiLevel(playerRef.current.getVolumeLevel());
@@ -236,6 +328,10 @@ export function Interview() {
   }, []);
 
   function cleanup() {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     stopMicTest(false);
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -263,6 +359,7 @@ export function Interview() {
   }
 
   function endInterview() {
+    isEndingRef.current = true;
     setStatus("ending");
     cleanup();
     navigate(`/result/${interviewId}`);
@@ -279,6 +376,14 @@ export function Interview() {
 
   return (
     <main className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground select-none">
+      {/* Auto-reconnect banner */}
+      {status === "reconnecting" && (
+        <div className="flex items-center justify-center gap-2 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs font-semibold text-amber-300 animate-pulse">
+          <Loader2 className="size-3.5 animate-spin" />
+          <span>Network connection lost. Reconnecting to Alex (attempt {reconnectAttempt}/10)...</span>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
         <div className="flex items-center gap-3">
@@ -287,6 +392,8 @@ export function Interview() {
               className={
                 status === "live"
                   ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+                  : status === "reconnecting"
+                  ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"
                   : "hidden"
               }
             />
@@ -297,7 +404,7 @@ export function Interview() {
                   ? "bg-emerald-400"
                   : status === "error"
                   ? "bg-destructive"
-                  : status === "connecting"
+                  : status === "connecting" || status === "reconnecting"
                   ? "bg-amber-400"
                   : "bg-muted-foreground")
               }
@@ -308,6 +415,8 @@ export function Interview() {
               ? "Ready to join"
               : status === "connecting"
               ? "Connecting to Gemini Live…"
+              : status === "reconnecting"
+              ? `Reconnecting (${reconnectAttempt}/10)…`
               : status === "ending"
               ? "Generating Evaluation…"
               : status === "error"

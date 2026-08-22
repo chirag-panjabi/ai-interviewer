@@ -7,12 +7,75 @@ interface ClientMessage {
   pcm?: string; // Base64-encoded 16kHz mono 16-bit PCM
 }
 
+interface ActiveSession {
+  interviewId: string;
+  clientWs: any;
+  geminiWs: WsClient | null;
+  isSessionActive: boolean;
+  currentAssistantTranscript: string;
+  currentUserTranscript: string;
+  audioChunkCount: number;
+  graceTimeout: ReturnType<typeof setTimeout> | null;
+  modelName: string;
+  cleanup: () => Promise<void>;
+  attachClient: (newClientWs: any) => void;
+}
+
+const activeSessions = new Map<string, ActiveSession>();
+
 export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
+  // Check if an existing session is still in grace period for this interviewId
+  const existingSession = activeSessions.get(interviewId);
+  if (existingSession && existingSession.isSessionActive && existingSession.geminiWs?.readyState === WsClient.OPEN) {
+    console.log(`[GeminiLive] Resuming active session for reconnected candidate: ${interviewId}`);
+    existingSession.attachClient(clientWs);
+    return;
+  }
+
   let geminiWs: WsClient | null = null;
   let isSessionActive = true;
+  let isExplicitEnd = false;
   let currentAssistantTranscript = "";
   let currentUserTranscript = "";
   let audioChunkCount = 0;
+  let activeClientWs = clientWs;
+  let graceTimeout: ReturnType<typeof setTimeout> | null = null;
+  const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview";
+
+  const sessionObj: ActiveSession = {
+    interviewId,
+    clientWs: activeClientWs,
+    geminiWs,
+    isSessionActive,
+    currentAssistantTranscript,
+    currentUserTranscript,
+    audioChunkCount,
+    graceTimeout,
+    modelName,
+    cleanup,
+    attachClient,
+  };
+
+  activeSessions.set(interviewId, sessionObj);
+
+  function attachClient(newClientWs: any) {
+    if (sessionObj.graceTimeout) {
+      clearTimeout(sessionObj.graceTimeout);
+      sessionObj.graceTimeout = null;
+      console.log(`[GeminiLive] Reconnect grace timer cancelled for ${interviewId}`);
+    }
+
+    activeClientWs = newClientWs;
+    sessionObj.clientWs = newClientWs;
+    bindClientWs(newClientWs);
+
+    // Notify frontend of successful reconnection
+    try {
+      newClientWs.send(JSON.stringify({ type: "reconnected", model: modelName }));
+    } catch (e) {
+      console.error("[GeminiLive] Error sending reconnected event:", e);
+    }
+  }
 
   async function init() {
     try {
@@ -21,8 +84,9 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
       });
 
       if (!interview) {
-        clientWs.send(JSON.stringify({ type: "error", message: "Interview not found" }));
-        clientWs.close();
+        activeClientWs.send(JSON.stringify({ type: "error", message: "Interview not found" }));
+        activeClientWs.close();
+        activeSessions.delete(interviewId);
         return;
       }
 
@@ -109,17 +173,16 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
 - **Phase 4: Fundamental CS & Algorithmic Trade-offs (Turns 7+)**:
   - Probe core computer science principles: time/space complexity, locking strategies, indexing internals, or concurrency primitives.`;
 
-      const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview";
       const host = "generativelanguage.googleapis.com";
       const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${config.GEMINI_API_KEY}`;
 
       console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId}`);
       geminiWs = new WsClient(uri);
+      sessionObj.geminiWs = geminiWs;
 
       geminiWs.on("open", () => {
         console.log(`[GeminiLive] Connected to Gemini Live API. Sending BidiGenerateContentSetup payload...`);
 
-        // Official BidiGenerateContentSetup schema according to Gemini Live API specifications
         const setupMessage = {
           setup: {
             model: `models/${modelName}`,
@@ -128,7 +191,7 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: "Aoede", // Aoede, Charon, Fenrir, Kore, Puck
+                    voiceName: "Aoede",
                   },
                 },
               },
@@ -155,10 +218,8 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
           if (response.setupComplete) {
             console.log(`[GeminiLive] Handshake verified (setupComplete) for ${interviewId}. Starting session...`);
             
-            // Notify frontend that session is live
-            clientWs.send(JSON.stringify({ type: "ready", model: modelName }));
+            activeClientWs.send(JSON.stringify({ type: "ready", model: modelName }));
 
-            // Trigger opening greeting with context-aware prompt
             const openingTurnText = hasValidRepos
               ? `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
               : `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question.`;
@@ -189,40 +250,47 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
             if (serverContent.modelTurn?.parts) {
               for (const part of serverContent.modelTurn.parts) {
                 if (part.inlineData && part.inlineData.data) {
-                  clientWs.send(
-                    JSON.stringify({
-                      type: "audio",
-                      pcm: part.inlineData.data,
-                      mimeType: part.inlineData.mimeType || "audio/pcm;rate=24000",
-                    })
-                  );
+                  try {
+                    activeClientWs.send(
+                      JSON.stringify({
+                        type: "audio",
+                        pcm: part.inlineData.data,
+                        mimeType: part.inlineData.mimeType || "audio/pcm;rate=24000",
+                      })
+                    );
+                  } catch (e) {
+                    // Client temporarily disconnected while speech was incoming
+                  }
                 }
                 if (part.text) {
                   currentAssistantTranscript += part.text;
-                  clientWs.send(
-                    JSON.stringify({
-                      type: "transcript",
-                      role: "assistant",
-                      text: part.text,
-                    })
-                  );
+                  try {
+                    activeClientWs.send(
+                      JSON.stringify({
+                        type: "transcript",
+                        role: "assistant",
+                        text: part.text,
+                      })
+                    );
+                  } catch (e) {}
                 }
               }
             }
 
-            // B. Streaming model output transcription (Speech-to-Text of model)
+            // B. Streaming model output transcription
             if (serverContent.outputTranscription?.text) {
               const text = serverContent.outputTranscription.text;
               currentAssistantTranscript += text;
-              clientWs.send(
-                JSON.stringify({
-                  type: "transcript",
-                  role: "assistant",
-                  text,
-                })
-              );
+              try {
+                activeClientWs.send(
+                  JSON.stringify({
+                    type: "transcript",
+                    role: "assistant",
+                    text,
+                  })
+                );
+              } catch (e) {}
 
-              // If user had previous speech, save it to DB once model starts answering
               if (currentUserTranscript.trim()) {
                 const userText = currentUserTranscript.trim();
                 currentUserTranscript = "";
@@ -237,28 +305,34 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
               }
             }
 
-            // C. Streaming user input transcription (Speech-to-Text of candidate)
+            // C. Streaming user input transcription
             if (serverContent.inputTranscription?.text) {
               const text = serverContent.inputTranscription.text;
               currentUserTranscript += text;
-              clientWs.send(
-                JSON.stringify({
-                  type: "transcript",
-                  role: "user",
-                  text,
-                })
-              );
+              try {
+                activeClientWs.send(
+                  JSON.stringify({
+                    type: "transcript",
+                    role: "user",
+                    text,
+                  })
+                );
+              } catch (e) {}
             }
 
             // D. Barge-in / Interruption
             if (serverContent.interrupted) {
               console.log(`[GeminiLive] Interruption detected for interview: ${interviewId}`);
-              clientWs.send(JSON.stringify({ type: "interrupt" }));
+              try {
+                activeClientWs.send(JSON.stringify({ type: "interrupt" }));
+              } catch (e) {}
             }
 
             // E. Model Turn Complete
             if (serverContent.turnComplete) {
-              clientWs.send(JSON.stringify({ type: "turnComplete" }));
+              try {
+                activeClientWs.send(JSON.stringify({ type: "turnComplete" }));
+              } catch (e) {}
               if (currentAssistantTranscript.trim()) {
                 const assistantText = currentAssistantTranscript.trim();
                 currentAssistantTranscript = "";
@@ -280,7 +354,9 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
 
       geminiWs.on("error", (err) => {
         console.error(`[GeminiLive] Gemini WS Error (${interviewId}):`, err.message);
-        clientWs.send(JSON.stringify({ type: "error", message: "Live audio session error" }));
+        try {
+          activeClientWs.send(JSON.stringify({ type: "error", message: "Live audio session error" }));
+        } catch (e) {}
       });
 
       geminiWs.on("close", (code, reason) => {
@@ -289,7 +365,9 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
       });
     } catch (err: any) {
       console.error("[GeminiLive] Init error:", err);
-      clientWs.send(JSON.stringify({ type: "error", message: err.message }));
+      try {
+        activeClientWs.send(JSON.stringify({ type: "error", message: err.message }));
+      } catch (e) {}
       cleanup();
     }
   }
@@ -297,6 +375,12 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
   async function cleanup() {
     if (!isSessionActive) return;
     isSessionActive = false;
+    activeSessions.delete(interviewId);
+
+    if (sessionObj.graceTimeout) {
+      clearTimeout(sessionObj.graceTimeout);
+      sessionObj.graceTimeout = null;
+    }
 
     // Flush any remaining transcripts to database
     if (currentUserTranscript.trim()) {
@@ -332,49 +416,59 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
     }
   }
 
-  // Handle messages from client frontend
-  clientWs.on("message", (rawMsg: any) => {
-    if (!isSessionActive) return;
+  function bindClientWs(ws: any) {
+    ws.on("message", (rawMsg: any) => {
+      if (!isSessionActive) return;
 
-    try {
-      const msg: ClientMessage = JSON.parse(rawMsg.toString());
+      try {
+        const msg: ClientMessage = JSON.parse(rawMsg.toString());
 
-      if (msg.type === "audio" && msg.pcm && geminiWs && geminiWs.readyState === WsClient.OPEN) {
-        audioChunkCount++;
-        if (audioChunkCount % 50 === 1) {
-          console.log(`[GeminiLive] Streaming mic audio chunk #${audioChunkCount} (${interviewId})`);
-        }
+        if (msg.type === "audio" && msg.pcm && geminiWs && geminiWs.readyState === WsClient.OPEN) {
+          audioChunkCount++;
+          if (audioChunkCount % 50 === 1) {
+            console.log(`[GeminiLive] Streaming mic audio chunk #${audioChunkCount} (${interviewId})`);
+          }
 
-        // Send 16kHz 16-bit PCM chunk via BidiGenerateContentRealtimeInput.audio
-        const realtimeInput = {
-          realtimeInput: {
-            audio: {
-              mimeType: "audio/pcm;rate=16000",
-              data: msg.pcm,
+          const realtimeInput = {
+            realtimeInput: {
+              audio: {
+                mimeType: "audio/pcm;rate=16000",
+                data: msg.pcm,
+              },
             },
-          },
-        };
-        geminiWs.send(JSON.stringify(realtimeInput));
-      } else if (msg.type === "ping") {
-        clientWs.send(JSON.stringify({ type: "pong" }));
-      } else if (msg.type === "end") {
-        cleanup();
-        clientWs.close();
+          };
+          geminiWs.send(JSON.stringify(realtimeInput));
+        } else if (msg.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+        } else if (msg.type === "end") {
+          isExplicitEnd = true;
+          cleanup();
+          ws.close();
+        }
+      } catch (err) {
+        console.error("[GeminiLive] Error processing client message:", err);
       }
-    } catch (err) {
-      console.error("[GeminiLive] Error processing client message:", err);
-    }
-  });
+    });
 
-  clientWs.on("close", () => {
-    console.log(`[GeminiLive] Client disconnected (${interviewId})`);
-    cleanup();
-  });
+    ws.on("close", () => {
+      if (isExplicitEnd || !isSessionActive) {
+        console.log(`[GeminiLive] Client session cleanly terminated for ${interviewId}`);
+        cleanup();
+      } else {
+        console.log(`[GeminiLive] Client disconnected unexpectedly (${interviewId}). Preserving session for 30s grace period...`);
+        if (sessionObj.graceTimeout) clearTimeout(sessionObj.graceTimeout);
+        sessionObj.graceTimeout = setTimeout(() => {
+          console.log(`[GeminiLive] Grace period expired for ${interviewId}. Cleaning up session.`);
+          cleanup();
+        }, 30000);
+      }
+    });
 
-  clientWs.on("error", (err: any) => {
-    console.error(`[GeminiLive] Client WS error (${interviewId})`, err);
-    cleanup();
-  });
+    ws.on("error", (err: any) => {
+      console.error(`[GeminiLive] Client WS error (${interviewId})`, err);
+    });
+  }
 
+  bindClientWs(activeClientWs);
   init();
 }

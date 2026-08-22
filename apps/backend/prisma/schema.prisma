@@ -18,6 +18,10 @@ model Interview {
   conversations     Message[]
   feedback          String?
   evaluationData    Json?
+  createdAt         DateTime        @default(now())
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Message {
@@ -27,6 +31,8 @@ model Message {
   interviewId     String
   interview       Interview   @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   createdAt       DateTime    @default(now())
+
+  @@index([interviewId, createdAt])
 }
 
 enum MessageType {

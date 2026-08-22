@@ -3,11 +3,12 @@ import { PreInterviewBody } from "../types";
 import { scrapeGithub } from "../services/github";
 import { prisma } from "../db";
 import { calculateResult } from "../services/evaluation";
+import { interviewCreationLimiter } from "../index";
 
 export const interviewRouter = Router();
 
-// 1. Ingest GitHub profile and initialize interview
-interviewRouter.post("/pre-interview", async (req, res) => {
+// 1. Ingest GitHub profile and initialize interview (Rate limited to 15 / day / IP)
+interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
   const { success, data } = PreInterviewBody.safeParse(req.body);
 
   if (!success) {

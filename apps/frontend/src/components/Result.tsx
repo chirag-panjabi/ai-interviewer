@@ -183,39 +183,29 @@ export function Result() {
   const cat4Title = isBehavioral ? "Leadership Signals" : isDSA ? "Complexity Analysis" : "Engineering Depth";
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-12">
-      <header className="mb-10 flex items-center justify-between">
+    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
+      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/")}
-            className="rounded-full"
+            className="shrink-0 rounded-full"
             data-no-print
           >
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">Interview Evaluation</h1>
-              {trackLabel && (
-                <span className="hidden sm:inline-flex items-center rounded-md border border-border/80 bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground/80">
-                  {trackLabel}
-                </span>
-              )}
-              {levelLabel && (
-                <span className="hidden sm:inline-flex items-center rounded-md border border-border/80 bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground/80">
-                  {levelLabel}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl whitespace-nowrap">
+              Interview Evaluation
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
               Powered by <span className="font-semibold text-foreground/80">{modelDisplayName}</span> standardized evaluation rubric.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2" data-no-print>
+        <div className="flex items-center gap-2 self-end sm:self-auto" data-no-print>
           {ready && (
             <>
               <Button
@@ -242,7 +232,7 @@ export function Result() {
             </>
           )}
 
-          <Button variant="default" size="sm" onClick={() => navigate("/")} className="rounded-lg text-xs">
+          <Button variant="default" size="sm" onClick={() => navigate("/")} className="rounded-lg text-xs font-medium">
             New interview
           </Button>
         </div>

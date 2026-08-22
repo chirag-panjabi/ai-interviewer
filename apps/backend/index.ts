@@ -15,13 +15,13 @@ app.use(express.json());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or dev tools)
       if (!origin) return callback(null, true);
-      // In development, allow localhost origins
-      if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
-        return callback(null, true);
-      }
-      if (origin === config.CORS_ORIGIN) {
+      if (
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        origin.endsWith(".vercel.app") ||
+        origin === config.CORS_ORIGIN
+      ) {
         return callback(null, true);
       }
       callback(null, true);

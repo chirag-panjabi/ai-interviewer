@@ -482,13 +482,10 @@ export function Result() {
             <div className="lg:col-span-7 space-y-6">
               {/* Executive Summary Box */}
               <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground">
                     <FileText className="size-3.5 text-primary" />
                     Executive Evaluation Summary
-                  </span>
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    Synthesized by {modelDisplayName}
                   </span>
                 </div>
                 <p className="text-sm leading-relaxed text-foreground/90">

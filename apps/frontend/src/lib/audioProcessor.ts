@@ -302,6 +302,20 @@ export class LiveMicrophoneRecorder {
     return this.currentVolume;
   }
 
+  public async resume(): Promise<boolean> {
+    if (this.audioCtx && this.audioCtx.state === "suspended") {
+      try {
+        await this.audioCtx.resume();
+        console.log("[LiveMicrophoneRecorder] Resumed AudioContext");
+        return true;
+      } catch (e) {
+        console.warn("[LiveMicrophoneRecorder] Resume failed:", e);
+        return false;
+      }
+    }
+    return true;
+  }
+
   public stop(): void {
     if (this.sourceNode) {
       this.sourceNode.disconnect();

@@ -120,6 +120,8 @@ export function Interview() {
     setTestVolume(0);
   };
 
+  const [isOffline, setIsOffline] = useState(false);
+
   const startHeartbeat = (ws: WebSocket) => {
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     heartbeatIntervalRef.current = setInterval(() => {
@@ -133,23 +135,61 @@ export function Interview() {
     }, 15000);
   };
 
-  // Auto-reconnect loop (up to 10 attempts / 30 seconds)
+  // Helper to ensure recorder is running and dynamically reading current socketRef
+  const ensureRecorderRunning = async (existingStream?: MediaStream) => {
+    if (recorderRef.current) {
+      await recorderRef.current.resume();
+      return;
+    }
+
+    const recorder = new LiveMicrophoneRecorder((pcm) => {
+      const ws = socketRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN && !isMutedRef.current) {
+        try {
+          ws.send(JSON.stringify({ type: "audio", pcm }));
+        } catch (e) {
+          console.warn("[Interview] Audio send failed:", e);
+        }
+      }
+    });
+
+    await recorder.start(existingStream && existingStream.active ? existingStream : undefined);
+    recorderRef.current = recorder;
+  };
+
+  // Auto-reconnect loop with exponential backoff and online/offline awareness
   const attemptReconnect = (attempt = 1) => {
     if (isEndingRef.current || !interviewId) return;
 
-    if (attempt > 10) {
+    // If browser is offline, pause retry attempts until 'online' event fires
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.log("[Interview] Browser is offline. Pausing reconnect until internet is restored.");
+      setStatus("reconnecting");
+      setIsOffline(true);
+      return;
+    }
+    setIsOffline(false);
+
+    if (attempt > 15) {
       setStatus("error");
-      setErrorMessage("Network connection lost. Please check your internet connection and refresh.");
+      setErrorMessage("Network connection lost. Please check your internet connection and click Reconnect.");
       return;
     }
 
     setStatus("reconnecting");
     setReconnectAttempt(attempt);
 
+    // Flush stale audio buffer from before disconnect
+    playerRef.current?.interrupt();
+
     const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
-    console.log(`[Interview] Attempting auto-reconnect (${attempt}/10) to ${wsUrl}...`);
+    console.log(`[Interview] Attempting auto-reconnect (${attempt}/15) to ${wsUrl}...`);
 
     try {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.close();
+      }
+
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
@@ -171,22 +211,16 @@ export function Interview() {
             if (data.model) setActiveModel(data.model);
 
             if (playerRef.current) {
+              playerRef.current.interrupt();
               await playerRef.current.resume();
             }
 
-            // Resume audio recording
-            if (!recorderRef.current) {
-              const recorder = new LiveMicrophoneRecorder((pcm) => {
-                if (socket.readyState === WebSocket.OPEN && !isMutedRef.current) {
-                  socket.send(JSON.stringify({ type: "audio", pcm }));
-                }
-              });
-              await recorder.start();
-              recorderRef.current = recorder;
-            }
+            // Ensure microphone recorder is active and un-suspended
+            await ensureRecorderRunning();
 
             setStatus("live");
             setReconnectAttempt(0);
+            setIsOffline(false);
           } else if (data.type === "audio" && data.pcm) {
             playerRef.current?.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
@@ -211,9 +245,10 @@ export function Interview() {
 
       socket.onclose = () => {
         if (!isEndingRef.current && status !== "error") {
+          const delay = Math.min(8000, 1500 * Math.pow(1.25, attempt - 1)) + Math.random() * 400;
           reconnectTimeoutRef.current = setTimeout(() => {
             attemptReconnect(attempt + 1);
-          }, 2500);
+          }, delay);
         }
       };
 
@@ -221,9 +256,10 @@ export function Interview() {
         // Handled by onclose retry
       };
     } catch (e) {
+      const delay = Math.min(8000, 1500 * Math.pow(1.25, attempt - 1)) + Math.random() * 400;
       reconnectTimeoutRef.current = setTimeout(() => {
         attemptReconnect(attempt + 1);
-      }, 2500);
+      }, delay);
     }
   };
 
@@ -269,15 +305,7 @@ export function Interview() {
             if (data.model) setActiveModel(data.model);
 
             await player.resume();
-
-            const recorder = new LiveMicrophoneRecorder((pcm) => {
-              if (socket.readyState === WebSocket.OPEN && !isMutedRef.current) {
-                socket.send(JSON.stringify({ type: "audio", pcm }));
-              }
-            });
-
-            await recorder.start(reusableStream && reusableStream.active ? reusableStream : undefined);
-            recorderRef.current = recorder;
+            await ensureRecorderRunning(reusableStream && reusableStream.active ? reusableStream : undefined);
 
             setStatus("live");
             if (callStartTimeRef.current === 0) {
@@ -307,9 +335,8 @@ export function Interview() {
           } else if (data.type === "turnComplete") {
             // Finished current speech turn
           } else if (data.type === "error") {
-            console.error("[Interview] Backend error:", data.message);
             setStatus("error");
-            setErrorMessage(data.message || "An error occurred with the live session.");
+            setErrorMessage(data.message || "Connection error with interviewer");
           }
         } catch (e) {
           console.error("[Interview] Error parsing WS message:", e);
@@ -348,10 +375,35 @@ export function Interview() {
   };
 
   useEffect(() => {
+    const handleOnline = () => {
+      console.log("[Interview] Browser online event fired. Triggering immediate reconnect...");
+      setIsOffline(false);
+      if (status === "reconnecting" || status === "live") {
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+        attemptReconnect(1);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log("[Interview] Browser offline event fired.");
+      setIsOffline(true);
+      if (status === "live") {
+        setStatus("reconnecting");
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
       cleanup();
     };
-  }, []);
+  }, [status]);
 
   function cleanup() {
     if (reconnectTimeoutRef.current) {
@@ -408,9 +460,24 @@ export function Interview() {
     <main className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground select-none">
       {/* Auto-reconnect banner */}
       {status === "reconnecting" && (
-        <div className="flex items-center justify-center gap-2 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs font-semibold text-amber-300 animate-pulse">
-          <Loader2 className="size-3.5 animate-spin" />
-          <span>Network connection lost. Reconnecting to Alex (attempt {reconnectAttempt}/10)...</span>
+        <div className="flex items-center justify-between bg-amber-500/15 border-b border-amber-500/30 px-6 py-2.5 text-xs font-semibold text-amber-300 backdrop-blur">
+          <div className="flex items-center gap-2">
+            <Loader2 className="size-3.5 animate-spin" />
+            <span>
+              {isOffline
+                ? "You are currently offline. Reconnecting as soon as network returns..."
+                : `Connection interrupted. Reconnecting to Alex (attempt ${reconnectAttempt}/15)...`}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+              attemptReconnect(1);
+            }}
+            className="rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2.5 py-1 text-[11px] font-bold text-amber-200 transition-colors cursor-pointer"
+          >
+            Reconnect Now
+          </button>
         </div>
       )}
 

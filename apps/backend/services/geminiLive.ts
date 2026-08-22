@@ -136,7 +136,15 @@ ${reposList}`;
         }
       }
 
-      const systemPrompt = buildSystemPrompt({
+      // Check if this interview already has messages in the database (indicating a post-grace reconnection or server restart)
+      const existingMessages = await prisma.message.findMany({
+        where: { interviewId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const isResumingSession = existingMessages.length > 0;
+
+      let systemPrompt = buildSystemPrompt({
         experienceLevel: (interview.experienceLevel as any) || "MID",
         track: (interview.track as any) || "FULLSTACK_GENERAL",
         candidateDisplayName,
@@ -144,10 +152,26 @@ ${reposList}`;
         hasValidRepos,
       });
 
+      if (isResumingSession) {
+        const transcriptHistory = existingMessages
+          .map((m) => `[${m.type === "User" ? "Candidate" : "Alex"}]: ${m.message}`)
+          .join("\n\n");
+
+        systemPrompt += `\n\n### CONVERSATION CONTINUATION NOTICE (IMPORTANT):
+This is a continuation of an ongoing live interview that was temporarily disconnected due to a network glitch.
+Do NOT introduce yourself again. Do NOT repeat your opening greeting.
+Acknowledge the candidate's return naturally and warmly in ONE brief sentence (e.g., "Welcome back! Glad you're reconnected."), and immediately continue the interview based on the transcript below.
+
+### INTERVIEW TRANSCRIPT PRIOR TO DISCONNECT:
+${transcriptHistory}
+`;
+        console.log(`[GeminiLive] Injected ${existingMessages.length} prior conversation turns into system prompt for resilient resumption (${interviewId}).`);
+      }
+
       const host = "generativelanguage.googleapis.com";
       const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${config.GEMINI_API_KEY}`;
 
-      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Track: ${interview.track}, Level: ${interview.experienceLevel}]`);
+      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Track: ${interview.track}, Level: ${interview.experienceLevel}, Resuming: ${isResumingSession}]`);
       geminiWs = new WsClient(uri);
       sessionObj.geminiWs = geminiWs;
 
@@ -189,11 +213,13 @@ ${reposList}`;
           if (response.setupComplete) {
             console.log(`[GeminiLive] Handshake verified (setupComplete) for ${interviewId}. Starting session...`);
             
-            activeClientWs.send(JSON.stringify({ type: "ready", model: modelName }));
+            activeClientWs.send(JSON.stringify({ type: isResumingSession ? "reconnected" : "ready", model: modelName }));
 
-            const openingTurnText = hasValidRepos
-              ? `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
-              : `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question.`;
+            const openingTurnText = isResumingSession
+              ? `Alex, my internet connection dropped for a moment, but I am reconnected now. Please continue the interview from where we left off.`
+              : (hasValidRepos
+                  ? `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
+                  : `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question.`);
 
             geminiWs?.send(
               JSON.stringify({

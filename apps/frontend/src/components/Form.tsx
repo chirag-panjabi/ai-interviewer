@@ -410,6 +410,14 @@ export function Form() {
         </header>
 
         <section className="mb-8 text-left">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary uppercase tracking-wider">
+              Real-Time Voice Evaluator
+            </span>
+            <span className="text-[11px] font-mono text-muted-foreground tabular-nums">
+              P95 LATENCY &lt; 350MS
+            </span>
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             AI Technical Interviewer
           </h1>
@@ -432,13 +440,15 @@ export function Form() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div role="radiogroup" aria-label="Select Seniority Baseline" className="grid grid-cols-3 gap-2">
                 {EXPERIENCE_LEVELS.map((lvl) => {
                   const isSelected = experienceLevel === lvl.id;
                   return (
                     <button
                       key={lvl.id}
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
                       disabled={loading}
                       onClick={() => setExperienceLevel(lvl.id)}
                       className={cn(
@@ -477,7 +487,7 @@ export function Form() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div role="radiogroup" aria-label="Select Focus Track" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {TRACKS.map((t) => {
                   const isSelected = track === t.id;
                   const Icon = t.icon;
@@ -485,6 +495,8 @@ export function Form() {
                     <button
                       key={t.id}
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
                       disabled={loading}
                       onClick={() => setTrack(t.id)}
                       className={cn(
@@ -606,8 +618,31 @@ export function Form() {
                 const parsed = parseInput(github);
                 if (!parsed.isValid || !parsed.username) {
                   return (
-                    <div className="mt-4 rounded-xl border border-dashed border-border/60 p-4 text-center text-xs text-muted-foreground">
-                      Enter a GitHub profile to inspect public repositories or target project architecture.
+                    <div className="mt-4 rounded-xl border border-dashed border-border/60 p-4 text-center text-xs text-muted-foreground space-y-2">
+                      <p>Enter a GitHub profile to inspect public repositories or target project architecture.</p>
+                      <div className="flex items-center justify-center gap-1.5 pt-1">
+                        <span className="text-[10px] uppercase font-mono text-muted-foreground/80">Quick demo:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGithub("torvalds");
+                            triggerPreviewFetch("torvalds");
+                          }}
+                          className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] font-mono text-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                        >
+                          torvalds
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGithub("facebook");
+                            triggerPreviewFetch("facebook");
+                          }}
+                          className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] font-mono text-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                        >
+                          facebook
+                        </button>
+                      </div>
                     </div>
                   );
                 }
@@ -615,7 +650,7 @@ export function Form() {
                 const hasRepos = Boolean(profilePreview?.repos && profilePreview.repos.length > 0);
 
                 return (
-                  <div className={cn("mt-4 space-y-2", fetchingPreview && "opacity-70")}>
+                  <div role="radiogroup" aria-label="Select Target Architecture Focus" className={cn("mt-4 space-y-2", fetchingPreview && "opacity-70")}>
                     <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
                       <span className="flex items-center gap-1.5">
                         <FolderGit2 className="size-3 text-primary" />
@@ -625,6 +660,8 @@ export function Form() {
 
                     <button
                       type="button"
+                      role="radio"
+                      aria-checked={isGeneralDomainOnly}
                       disabled={loading}
                       onClick={() => {
                         setIsGeneralDomainOnly(true);
@@ -662,6 +699,8 @@ export function Form() {
                           <button
                             key={r.name}
                             type="button"
+                            role="radio"
+                            aria-checked={isSelected}
                             disabled={loading}
                             onClick={() => {
                               setSelectedRepo(r.name);
@@ -711,6 +750,8 @@ export function Form() {
 
                     <button
                       type="button"
+                      role="radio"
+                      aria-checked={isCustomMode}
                       disabled={loading}
                       onClick={() => {
                         setIsCustomMode(true);

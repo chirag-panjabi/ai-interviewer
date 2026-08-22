@@ -2,10 +2,10 @@ import http from "node:http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { rateLimit } from "express-rate-limit";
 import { WebSocketServer, WebSocket } from "ws";
 import { config, validateConfig } from "./config";
 import { prisma } from "./db";
+import { generalLimiter } from "./middleware/rateLimiter";
 import { interviewRouter } from "./routes/interview";
 import { handleGeminiLiveSession } from "./services/geminiLive";
 
@@ -45,25 +45,7 @@ app.use(
 );
 
 // General API Rate Limiting (100 req/min per IP)
-const generalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 100,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: { message: "Too many requests from this IP, please try again shortly." },
-});
 app.use("/api/", generalLimiter);
-
-// Strict Rate Limiting on Interview Creation (15 interviews per IP per 24 hours)
-export const interviewCreationLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  limit: 15, // max 15 per day
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    message: "You have reached the daily screening limit (15 interviews per day). Please try again tomorrow.",
-  },
-});
 
 // Deep Health & Telemetry Check
 const healthHandler = async (_: express.Request, res: express.Response) => {

@@ -3,7 +3,7 @@ import { PreInterviewBody } from "../types";
 import { scrapeGithub } from "../services/github";
 import { prisma } from "../db";
 import { calculateResult } from "../services/evaluation";
-import { interviewCreationLimiter } from "../index";
+import { interviewCreationLimiter } from "../middleware/rateLimiter";
 
 export const interviewRouter = Router();
 

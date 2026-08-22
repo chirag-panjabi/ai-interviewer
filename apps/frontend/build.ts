@@ -123,7 +123,15 @@ const start = performance.now();
 const entrypoints = [...new Bun.Glob("**.html").scanSync("src")]
   .map(a => path.resolve("src", a))
   .filter(dir => !dir.includes("node_modules"));
-console.log(`📄 Found ${entrypoints.length} HTML ${entrypoints.length === 1 ? "file" : "files"} to process\n`);
+const resolvedBackendUrl =
+  process.env.BUN_PUBLIC_BACKEND_URL ||
+  process.env.VITE_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.REACT_APP_BACKEND_URL ||
+  process.env.BACKEND_URL ||
+  "";
+
+console.log(`🔗 Target Backend URL: ${resolvedBackendUrl || "(fallback: http://localhost:3001)"}\n`);
 
 const result = await Bun.build({
   entrypoints,
@@ -134,8 +142,11 @@ const result = await Bun.build({
   sourcemap: "linked",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
-    "process.env.BUN_PUBLIC_BACKEND_URL": JSON.stringify(process.env.BUN_PUBLIC_BACKEND_URL || ""),
-    "process.env.VITE_BACKEND_URL": JSON.stringify(process.env.VITE_BACKEND_URL || ""),
+    "process.env.BUN_PUBLIC_BACKEND_URL": JSON.stringify(resolvedBackendUrl),
+    "process.env.VITE_BACKEND_URL": JSON.stringify(resolvedBackendUrl),
+    "process.env.NEXT_PUBLIC_BACKEND_URL": JSON.stringify(resolvedBackendUrl),
+    "process.env.REACT_APP_BACKEND_URL": JSON.stringify(resolvedBackendUrl),
+    "process.env.BACKEND_URL": JSON.stringify(resolvedBackendUrl),
   },
   ...cliConfig,
 });

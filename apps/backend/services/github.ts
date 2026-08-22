@@ -1,5 +1,10 @@
 import axios from "axios";
+import https from "node:https";
 import { config } from "../config";
+
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: process.env.NODE_ENV === "production",
+});
 
 export interface GithubRepo {
   name: string;
@@ -102,9 +107,7 @@ function getGithubHeaders(): Record<string, string> {
 
   if (config.GITHUB_TOKEN) {
     const cleanToken = config.GITHUB_TOKEN.trim().replace(/^["']|["']$/g, "");
-    headers["Authorization"] = cleanToken.startsWith("ghp_") || cleanToken.startsWith("github_pat_")
-      ? `Bearer ${cleanToken}`
-      : `token ${cleanToken}`;
+    headers["Authorization"] = `Bearer ${cleanToken}`;
   }
 
   return headers;
@@ -125,6 +128,7 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
   try {
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
+      httpsAgent,
       timeout: 8000,
     });
     const userData = userRes.data;
@@ -133,6 +137,7 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=30`,
       {
         headers,
+        httpsAgent,
         timeout: 8000,
       }
     );
@@ -222,6 +227,7 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
     // Fetch user profile info
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
+      httpsAgent,
       timeout: 10000,
     });
 
@@ -232,6 +238,7 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=20`,
       {
         headers,
+        httpsAgent,
         timeout: 10000,
       }
     );
@@ -266,6 +273,7 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
                 ...headers,
                 Accept: "application/vnd.github.v3.raw",
               },
+              httpsAgent,
               timeout: 5000,
               responseType: "text",
             }

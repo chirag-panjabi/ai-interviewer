@@ -58,6 +58,8 @@ interface ProfilePreview {
   avatarUrl: string | null;
   publicReposCount: number;
   repos: RepoPreview[];
+  rateLimited?: boolean;
+  error?: string | null;
 }
 
 const EXPERIENCE_LEVELS: Array<{
@@ -569,7 +571,19 @@ export function Form() {
 
                 {!hasRepos && !fetchingPreview && (
                   <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-[11px] text-muted-foreground">
-                    💡 No public repos auto-listed. You can select <strong>General Domain</strong> or specify any public repo below:
+                    {profilePreview?.rateLimited ? (
+                      <span>
+                        ⚠️ GitHub API rate limit reached on server (60 req/hr). Add <code className="rounded bg-muted px-1 text-primary">GITHUB_TOKEN</code> to your backend <code className="rounded bg-muted px-1 text-primary">.env</code> for 5,000 req/hr. In the meantime, select <strong>General Domain</strong> or enter a repo manually below:
+                      </span>
+                    ) : profilePreview?.error ? (
+                      <span>
+                        💡 {profilePreview.error} You can select <strong>General Domain</strong> or specify any public repo below:
+                      </span>
+                    ) : (
+                      <span>
+                        💡 No public repos auto-listed. You can select <strong>General Domain</strong> or specify any public repo below:
+                      </span>
+                    )}
                   </div>
                 )}
 

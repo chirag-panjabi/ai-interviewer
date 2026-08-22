@@ -1,10 +1,5 @@
 import axios from "axios";
-import https from "https";
 import { config } from "../config";
-
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === "production",
-});
 
 export interface GithubRepo {
   name: string;
@@ -31,6 +26,8 @@ export interface GithubProfilePreview {
   avatarUrl: string | null;
   publicReposCount: number;
   repos: GithubRepoPreview[];
+  rateLimited?: boolean;
+  error?: string | null;
 }
 
 export interface GithubPortfolio {
@@ -128,7 +125,6 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
   try {
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
-      httpsAgent,
       timeout: 8000,
     });
     const userData = userRes.data;
@@ -137,7 +133,6 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=30`,
       {
         headers,
-        httpsAgent,
         timeout: 8000,
       }
     );
@@ -179,6 +174,8 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
   } catch (err: any) {
     const status = err?.response?.status;
     const msg = err?.response?.data?.message || err.message;
+    const isRateLimit = status === 403 && typeof msg === "string" && msg.toLowerCase().includes("rate limit");
+
     console.error(`[GitHubPreview] API error for ${username} (HTTP ${status || "unknown"}): ${msg}`);
 
     // If a specific repo was supplied in URL, preserve it in fallback preview
@@ -200,6 +197,14 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
       avatarUrl: `https://github.com/${username}.png`,
       publicReposCount: fallbackRepos.length,
       repos: fallbackRepos,
+      rateLimited: isRateLimit,
+      error: isRateLimit
+        ? "GitHub API rate limit reached (60 req/hr). Add GITHUB_TOKEN to .env for 5,000 req/hr."
+        : status === 401
+        ? "GitHub token is invalid or expired."
+        : status === 404
+        ? "GitHub profile not found."
+        : msg,
     };
   }
 }
@@ -213,7 +218,6 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
     // Fetch user profile info
     const userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(username)}`, {
       headers,
-      httpsAgent,
       timeout: 10000,
     });
 
@@ -224,7 +228,6 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
       `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=20`,
       {
         headers,
-        httpsAgent,
         timeout: 10000,
       }
     );
@@ -255,7 +258,6 @@ export async function scrapeGithub(input: string, explicitSelectedRepo?: string)
                 ...headers,
                 Accept: "application/vnd.github.v3.raw",
               },
-              httpsAgent,
               timeout: 5000,
               responseType: "text",
             }

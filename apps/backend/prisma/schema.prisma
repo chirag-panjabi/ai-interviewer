@@ -13,6 +13,8 @@ datasource db {
 model Interview {
   id                String          @id @default(uuid())
   githubMetadata    Json
+  experienceLevel   ExperienceLevel @default(MID)
+  track             InterviewTrack  @default(FULLSTACK_GENERAL)
   status            InterviewStatus @default(CREATED)
   score             Int             @default(0)
   conversations     Message[]
@@ -46,4 +48,21 @@ enum InterviewStatus {
   EVALUATING
   COMPLETED
   FAILED
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  MID
+  SENIOR
+}
+
+enum InterviewTrack {
+  FULLSTACK_GENERAL
+  BACKEND
+  FRONTEND
+  SYSTEM_DESIGN
+  DSA
+  BEHAVIORAL
+  DEVOPS_CLOUD
+  ML_AI
 }

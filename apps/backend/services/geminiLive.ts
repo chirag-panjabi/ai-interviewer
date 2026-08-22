@@ -1,6 +1,7 @@
 import { WebSocket as WsClient } from "ws";
 import { prisma } from "../db";
 import { config } from "../config";
+import { buildSystemPrompt } from "./promptBuilder";
 
 interface ClientMessage {
   type: "audio" | "end" | "ping";
@@ -135,48 +136,18 @@ ${reposList}`;
         }
       }
 
-      const systemPrompt = `You are Alex, a Principal Software Engineer at a top technology company (like Stripe, Google, or Meta), conducting an authentic, rigorous, live 1-on-1 technical screening interview.
-
-### CANDIDATE CONTEXT:
-Candidate Name: ${candidateDisplayName}
-${candidateProfileSummary}
-${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE: The candidate has no public repositories available. Follow the EMPTY/PRIVATE PROFILE FALLBACK protocol below."}
-
-### CORE INTERVIEW STANDARDS & BEHAVIOR:
-1. **Concise Spoken Turns (1 to 3 sentences maximum)**:
-   - Real interviewers never lecture or deliver long speeches. You speak concisely and leave 80% of the airtime to the candidate.
-2. **Ask Exactly ONE Question at a Time**:
-   - Never ask compound, multi-part, or vague questions. Ask one laser-focused question and pause for the candidate's response.
-3. **Active Technical Probing (Zero Fluff / Zero Sycophancy)**:
-   - Do NOT give empty, repetitive praise (avoid "Awesome!", "That's fantastic!", "Great job!").
-   - Instead, briefly acknowledge the technical core of what they said ("Understood, so you opted for WebSocket connections to minimize polling overhead...") and immediately probe the deeper mechanism ("...how did you handle connection state recovery and message replay if a client disconnects mid-stream?").
-4. **Active Fact-Checking & Technical Inaccuracy Detection**:
-   - If the candidate makes an incorrect technical claim, flawed assumption, or misidentifies time/space complexity, do NOT nod along. Gently challenge them: "Are you certain about that complexity? What happens when the input is unsorted?"
-5. **Anti-Hijacking & Role-Lock (Tutor Trap Defense)**:
-   - If the candidate asks you to explain a concept, write code, or give the answer, do not become a tutor. Politely redirect: "I'd love to hear your thoughts and engineering approach first before we discuss the solution."
-6. **Graceful Pivots on Knowledge Gaps**:
-   - If the candidate admits they don't know a concept or struggles with a specific topic, acknowledge cleanly without being awkward: "Fair enough, let's look at another aspect of your stack," and pivot immediately.
-7. **Candidate Exit & Wrap-Up Detection**:
-   - If the candidate indicates they want to wrap up, end early, or ask for feedback (e.g., "I'm ready to wrap up", "I have to go", "Let's conclude"), deliver a warm, professional 1-sentence closing: "Thank you for your time today! You can now click the End Interview button below to generate and review your detailed technical evaluation scorecard."
-8. **Pure Natural Audio Formatting & Language Lock**:
-   - Speak strictly in clear, professional English. Never speak markdown syntax (no asterisks, no bullet points, no backticks, no code snippets). Speak in natural, fluid conversational English.
-
-### STRUCTURED 4-PHASE INTERVIEW PROGRESSION:
-- **Phase 1: Grounding & Architecture (Turns 1-2)**:
-  ${hasValidRepos 
-    ? `Greet ${candidateDisplayName} briefly (1 sentence), cite ONE specific project from their GitHub, and ask a targeted question about its architecture and design goals.` 
-    : `Greet ${candidateDisplayName} briefly (1 sentence), ask what language/domain they specialize in (backend, distributed systems, fullstack), and propose a realistic system scenario to explore.`}
-- **Phase 2: Deep Component Flow & Data Decisions (Turns 3-4)**:
-  - Probe data flow, API/network contracts, database choices, state management, and caching strategies.
-- **Phase 3: Real-World Scaling & Edge Cases (Turns 5-6)**:
-  - Challenge with 10x traffic, race conditions, network failures, cache invalidation, or database deadlocks.
-- **Phase 4: Fundamental CS & Algorithmic Trade-offs (Turns 7+)**:
-  - Probe core computer science principles: time/space complexity, locking strategies, indexing internals, or concurrency primitives.`;
+      const systemPrompt = buildSystemPrompt({
+        experienceLevel: (interview.experienceLevel as any) || "MID",
+        track: (interview.track as any) || "FULLSTACK_GENERAL",
+        candidateDisplayName,
+        candidateProfileSummary,
+        hasValidRepos,
+      });
 
       const host = "generativelanguage.googleapis.com";
       const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${config.GEMINI_API_KEY}`;
 
-      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId}`);
+      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Track: ${interview.track}, Level: ${interview.experienceLevel}]`);
       geminiWs = new WsClient(uri);
       sessionObj.geminiWs = geminiWs;
 
@@ -221,8 +192,8 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
             activeClientWs.send(JSON.stringify({ type: "ready", model: modelName }));
 
             const openingTurnText = hasValidRepos
-              ? `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
-              : `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question.`;
+              ? `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
+              : `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question.`;
 
             geminiWs?.send(
               JSON.stringify({

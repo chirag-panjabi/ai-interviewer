@@ -56,9 +56,28 @@ interface ResultData {
   score: number;
   feedback: string;
   evaluationData?: EvaluationData;
+  experienceLevel?: "JUNIOR" | "MID" | "SENIOR";
+  track?: string;
   transcript: { type: "Assistant" | "User"; content: string; createdAt: string }[];
   status: string;
 }
+
+const TRACK_LABELS: Record<string, string> = {
+  FULLSTACK_GENERAL: "🌐 Full-Stack General",
+  BACKEND: "⚙️ Backend Engineering",
+  FRONTEND: "🎨 Frontend Engineering",
+  SYSTEM_DESIGN: "🏛️ System Design",
+  DSA: "🧮 DSA & Algorithms",
+  BEHAVIORAL: "🤝 Behavioral & Leadership",
+  DEVOPS_CLOUD: "☁️ DevOps & Cloud",
+  ML_AI: "🤖 ML & AI Engineering",
+};
+
+const LEVEL_LABELS: Record<string, string> = {
+  JUNIOR: "🌱 Junior (0-2y)",
+  MID: "🔧 Mid-Level (2-5y)",
+  SENIOR: "🏗️ Senior (5+y)",
+};
 
 export function Result() {
   const { interviewId } = useParams();
@@ -153,6 +172,15 @@ export function Result() {
   });
 
   const modelDisplayName = evalData?.evalModel || "Gemini AI";
+  const trackLabel = result.track ? (TRACK_LABELS[result.track] || result.track) : null;
+  const levelLabel = result.experienceLevel ? (LEVEL_LABELS[result.experienceLevel] || result.experienceLevel) : null;
+  const isBehavioral = result.track === "BEHAVIORAL";
+  const isDSA = result.track === "DSA";
+
+  const cat1Title = isBehavioral ? "Situation Framing" : isDSA ? "Algorithmic Correctness" : "Technical Accuracy";
+  const cat2Title = isBehavioral ? "Action Quality" : isDSA ? "Optimization Ability" : "Problem Solving";
+  const cat3Title = isBehavioral ? "Impact Articulation" : isDSA ? "Communication" : "Communication";
+  const cat4Title = isBehavioral ? "Leadership Signals" : isDSA ? "Complexity Analysis" : "Engineering Depth";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-12">
@@ -168,7 +196,19 @@ export function Result() {
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Interview Evaluation</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Interview Evaluation</h1>
+              {trackLabel && (
+                <span className="hidden sm:inline-flex items-center rounded-md border border-border/80 bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground/80">
+                  {trackLabel}
+                </span>
+              )}
+              {levelLabel && (
+                <span className="hidden sm:inline-flex items-center rounded-md border border-border/80 bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground/80">
+                  {levelLabel}
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Powered by <span className="font-semibold text-foreground/80">{modelDisplayName}</span> standardized evaluation rubric.
             </p>
@@ -216,7 +256,7 @@ export function Result() {
           <div>
             <p className="text-base font-semibold">Analyzing interview transcript…</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Evaluating technical accuracy, problem solving, communication, and engineering depth.
+              Evaluating candidate performance, rubric competencies, and engineering depth.
             </p>
           </div>
         </div>
@@ -230,11 +270,21 @@ export function Result() {
                   <Award className="size-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-lg font-bold">Overall Assessment</h2>
                     {evalData?.recommendation && (
                       <span className={cn("rounded-full border px-3 py-0.5 text-xs font-semibold", recBadge.bg)}>
                         {recBadge.label}
+                      </span>
+                    )}
+                    {trackLabel && (
+                      <span className="rounded-full border border-border bg-secondary/60 px-2.5 py-0.5 text-[11px] font-medium text-foreground/80">
+                        {trackLabel}
+                      </span>
+                    )}
+                    {levelLabel && (
+                      <span className="rounded-full border border-border bg-secondary/60 px-2.5 py-0.5 text-[11px] font-medium text-foreground/80">
+                        {levelLabel}
                       </span>
                     )}
                   </div>
@@ -260,14 +310,14 @@ export function Result() {
           {/* 4 Category Score Cards */}
           {evalData?.categories && (
             <section className="grid gap-4 sm:grid-cols-2">
-              {/* Technical Accuracy */}
+              {/* Category 1 */}
               <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-8 place-items-center rounded-lg bg-blue-500/15 text-blue-400">
                       <Code2 className="size-4" />
                     </div>
-                    <h3 className="text-sm font-semibold">Technical Accuracy</h3>
+                    <h3 className="text-sm font-semibold">{cat1Title}</h3>
                   </div>
                   <span className="text-base font-bold text-foreground">
                     {evalData.categories.technicalAccuracy.score}
@@ -279,14 +329,14 @@ export function Result() {
                 </p>
               </div>
 
-              {/* Problem Solving */}
+              {/* Category 2 */}
               <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-8 place-items-center rounded-lg bg-amber-500/15 text-amber-400">
                       <Brain className="size-4" />
                     </div>
-                    <h3 className="text-sm font-semibold">Problem Solving</h3>
+                    <h3 className="text-sm font-semibold">{cat2Title}</h3>
                   </div>
                   <span className="text-base font-bold text-foreground">
                     {evalData.categories.problemSolving.score}
@@ -298,14 +348,14 @@ export function Result() {
                 </p>
               </div>
 
-              {/* Communication */}
+              {/* Category 3 */}
               <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-8 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400">
                       <MessageSquare className="size-4" />
                     </div>
-                    <h3 className="text-sm font-semibold">Communication</h3>
+                    <h3 className="text-sm font-semibold">{cat3Title}</h3>
                   </div>
                   <span className="text-base font-bold text-foreground">
                     {evalData.categories.communication.score}
@@ -317,14 +367,14 @@ export function Result() {
                 </p>
               </div>
 
-              {/* Depth */}
+              {/* Category 4 */}
               <div className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/50 p-5 backdrop-blur">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-8 place-items-center rounded-lg bg-purple-500/15 text-purple-400">
                       <Layers className="size-4" />
                     </div>
-                    <h3 className="text-sm font-semibold">Engineering Depth</h3>
+                    <h3 className="text-sm font-semibold">{cat4Title}</h3>
                   </div>
                   <span className="text-base font-bold text-foreground">
                     {evalData.categories.depth.score}

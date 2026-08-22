@@ -24,6 +24,8 @@ interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res
     const interview = await prisma.interview.create({
       data: {
         githubMetadata: JSON.stringify(githubData),
+        experienceLevel: data.experienceLevel,
+        track: data.track,
         status: "CREATED",
       },
     });
@@ -95,6 +97,8 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
         score: interview.score,
         feedback: interview.feedback,
         evaluationData: parsedEvaluation,
+        experienceLevel: interview.experienceLevel,
+        track: interview.track,
         transcript,
         status: "COMPLETED",
       });
@@ -107,6 +111,8 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
         id: interview.id,
         status: "EVALUATING",
         message: "Evaluation is currently in progress...",
+        experienceLevel: interview.experienceLevel,
+        track: interview.track,
         transcript,
       });
       return;
@@ -118,8 +124,13 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       data: { status: "EVALUATING" },
     });
 
-    // Run evaluation with Gemini 3.7 Flash
-    const result = await calculateResult(interview.conversations, interview.githubMetadata);
+    // Run evaluation with Gemini 3.7 Flash, tailored to level & track
+    const result = await calculateResult(
+      interview.conversations,
+      interview.githubMetadata,
+      interview.experienceLevel,
+      interview.track
+    );
 
     // Save final structured evaluation
     const updated = await prisma.interview.update({
@@ -137,6 +148,8 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       score: updated.score,
       feedback: updated.feedback,
       evaluationData: result.evaluationData,
+      experienceLevel: updated.experienceLevel,
+      track: updated.track,
       transcript,
       status: "COMPLETED",
     });

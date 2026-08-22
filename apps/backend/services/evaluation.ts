@@ -32,7 +32,9 @@ export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
 
 export async function calculateResult(
   conversations: Array<{ type: string; message: string; createdAt?: Date }>,
-  githubMetadata?: any
+  githubMetadata?: any,
+  experienceLevel: string = "MID",
+  track: string = "FULLSTACK_GENERAL"
 ): Promise<{ score: number; feedback: string; evaluationData: EvaluationResult }> {
   if (!config.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not configured in backend environment.");
@@ -69,18 +71,18 @@ export async function calculateResult(
     const truncatedResult: EvaluationResult = {
       overallScore: 2.5,
       recommendation: "No Hire",
-      summary: `Interview session was truncated or ended prematurely after only ${userMessages.length} candidate response(s). Insufficient technical data was gathered to evaluate systems depth or problem solving.`,
+      summary: `Interview session was truncated or ended prematurely after only ${userMessages.length} candidate response(s). Insufficient data was gathered to evaluate skills depth.`,
       categories: {
-        technicalAccuracy: { score: 2.5, feedback: "Insufficient responses to gauge technical accuracy." },
-        problemSolving: { score: 2.5, feedback: "Session concluded before algorithmic or design problem solving could be assessed." },
+        technicalAccuracy: { score: 2.5, feedback: "Insufficient responses to gauge accuracy." },
+        problemSolving: { score: 2.5, feedback: "Session concluded before problem solving could be assessed." },
         communication: { score: 3.5, feedback: "Brief participation recorded." },
-        depth: { score: 2.0, feedback: "Did not engage in deep architecture or trade-off discussions." },
+        depth: { score: 2.0, feedback: "Did not engage in deep technical trade-off discussions." },
       },
       strengths: [
-        "Connected to the technical interview session.",
+        "Connected to the interview session.",
       ],
       improvements: [
-        "Participate in full multi-question interview session to demonstrate systems architecture and problem-solving depth.",
+        "Participate in full multi-question interview session to demonstrate problem-solving depth.",
       ],
       evidence: userMessages.slice(0, 2).map((m) => ({
         quote: m.message,
@@ -99,8 +101,71 @@ export async function calculateResult(
     .map((c) => `[${c.type}]: ${c.message}`)
     .join("\n\n");
 
+  // Track context description
+  let trackContext = "Full-Stack General software engineering (covering frontend, backend, APIs, and databases).";
+  let isBehavioral = track === "BEHAVIORAL";
+  let isDSA = track === "DSA";
+
+  if (track === "BACKEND") {
+    trackContext = "Backend Engineering (API architecture, database optimization, caching, concurrency, and message queues).";
+  } else if (track === "FRONTEND") {
+    trackContext = "Frontend Engineering (component design, state management, rendering performance, web standards, and UX responsiveness).";
+  } else if (track === "SYSTEM_DESIGN") {
+    trackContext = "System Design & Distributed Architecture (scalability, multi-tier topology, partition tolerance, and trade-off analysis).";
+  } else if (track === "DSA") {
+    trackContext = "Data Structures & Algorithms (algorithmic logic, asymptotic time/space bounds, and optimization).";
+  } else if (track === "BEHAVIORAL") {
+    trackContext = "Behavioral & Engineering Leadership (STAR-method situation storytelling, technical conflict, ownership, and mentorship).";
+  } else if (track === "DEVOPS_CLOUD") {
+    trackContext = "DevOps & Cloud Infrastructure (CI/CD pipelines, Kubernetes/containers, Infrastructure as Code, observability, and cloud resilience).";
+  } else if (track === "ML_AI") {
+    trackContext = "Machine Learning & AI Engineering (ML pipelines, vector embeddings, RAG architectures, model serving, and LLM evaluation).";
+  }
+
+  // Level-specific scoring rubric
+  let rubricText = "";
+  if (experienceLevel === "JUNIOR") {
+    rubricText = `- **0.0 - 3.9 (No Hire)**: Severe conceptual flaws on basic syntax, protocols, or fundamental concepts; unable to articulate simple logic.
+- **4.0 - 5.9 (Lean No Hire)**: Familiar with terminology but cannot explain how basic mechanisms or code flows operate without heavy guidance.
+- **6.0 - 7.9 (Hire - Junior Expectations Met)**: Solid grasp of fundamentals, correctly explains core patterns, demonstrates good problem-solving instincts and learning capacity. (Do NOT penalize for lacking distributed systems or advanced architecture depth).
+- **8.0 - 10.0 (Strong Hire - Exceptional Junior)**: Exceeds entry-level expectations; demonstrates architectural curiosity, clean code intuition, and ability to handle stretch questions.`;
+  } else if (experienceLevel === "SENIOR") {
+    rubricText = `- **0.0 - 3.9 (No Hire)**: Cannot justify architectural decisions, struggles with basic concurrency/data boundaries, or reveals fundamental gaps expected of senior engineers.
+- **4.0 - 5.9 (Lean No Hire)**: Conventional knowledge but struggles when pressed on distributed failure modes, edge cases, or multi-region scale.
+- **6.0 - 7.9 (Hire - Senior Expectations Met)**: Strong systems mastery, articulates architectural trade-offs with nuance, designs for failure, shows clear engineering maturity.
+- **8.0 - 10.0 (Strong Hire - Staff+ Master)**: Exceptional depth across high-scale distributed systems, proactive mitigation of cascading failures, exemplary trade-off communication.`;
+  } else {
+    // MID (Default)
+    rubricText = `- **0.0 - 3.9 (No Hire)**: Significant gaps in standard engineering practices, unable to explain core mechanisms in their stack.
+- **4.0 - 5.9 (Lean No Hire)**: Relies on surface buzzwords; struggles with database indexing, caching strategies, or error edge cases.
+- **6.0 - 7.9 (Hire - Mid-Level Expectations Met)**: Solid production intuition, correctly explains data flow, handles trade-offs well, articulates ideas clearly.
+- **8.0 - 10.0 (Strong Hire - Near Senior)**: Proactively identifies edge cases, demonstrates strong architectural depth beyond typical mid-level requirements.`;
+  }
+
+  // Category evaluation descriptions
+  let categoryDescriptions = `1. **Technical Accuracy**: Did the candidate state correct technical facts, APIs, protocols, and mechanisms?
+2. **Problem Solving & Trade-offs**: Did they reason through constraints effectively rather than reciting dogmatic answers?
+3. **Communication**: Was the candidate articulate, structured, and concise in their explanations?
+4. **Engineering Depth**: Did the candidate understand the *underlying mechanics* rather than dropping surface buzzwords?`;
+
+  if (isBehavioral) {
+    categoryDescriptions = `1. **Situation Framing (mapped to technicalAccuracy)**: Quality of context setting using the STAR method (clear Situation & Task).
+2. **Action Quality (mapped to problemSolving)**: Specificity and technical/operational decisiveness of the candidate's personal actions.
+3. **Impact & Communication (mapped to communication)**: Clear articulation of quantifiable business/technical impact and lessons learned.
+4. **Leadership Signals (mapped to depth)**: Demonstration of ownership, empathy, mentorship, and navigating conflict/ambiguity.`;
+  } else if (isDSA) {
+    categoryDescriptions = `1. **Algorithmic Correctness (mapped to technicalAccuracy)**: Correctness of data structure choices, logic, and edge-case awareness.
+2. **Optimization Ability (mapped to problemSolving)**: Ability to iterate from initial approach to an optimal runtime/memory solution.
+3. **Communication (mapped to communication)**: Structured thought process and ability to explain algorithmic invariants clearly.
+4. **Complexity Analysis (mapped to depth)**: Precise Big-O time and space complexity evaluation.`;
+  }
+
   const prompt = `You are a Principal Staff Software Engineer conducting an objective, rigorous technical interview evaluation.
 Evaluate the candidate's performance based strictly and exclusively on the interview transcript provided below.
+
+### INTERVIEW METADATA:
+- **Track**: ${trackContext}
+- **Declared Experience Level Baseline**: ${experienceLevel} (${experienceLevel === "JUNIOR" ? "0-2 years" : experienceLevel === "SENIOR" ? "5+ years" : "2-5 years"})
 
 ### CANDIDATE GITHUB CONTEXT:
 ${githubMetadata ? (typeof githubMetadata === "string" ? githubMetadata : JSON.stringify(githubMetadata, null, 2)) : "None provided"}
@@ -108,24 +173,24 @@ ${githubMetadata ? (typeof githubMetadata === "string" ? githubMetadata : JSON.s
 ### INTERVIEW TRANSCRIPT:
 ${transcriptFormatted}
 
-### STANDARDIZED SCORING CALIBRATION RUBRIC (0.0 to 10.0 scale):
-- **0.0 - 3.9 (No Hire)**: Severe conceptual flaws, inability to explain basic code/data flow, heavy evasion, or interview abandoned prematurely.
-- **4.0 - 5.9 (Lean No Hire / Junior)**: Familiar with common library and syntax names, but struggles with architectural trade-offs, concurrency, scaling, failure recovery, or relies on superficial buzzwords.
-- **6.0 - 7.9 (Hire / Mid-to-Senior)**: Solid systems intuition, correctly explains data flow and bottlenecks, understands concurrency and database trade-offs, communicates clearly.
-- **8.0 - 10.0 (Strong Hire / Staff+)**: Exceptional engineering depth, proactively discusses distributed edge cases, failure modes, backpressure, latency vs throughput trade-offs, and shows hands-on mastery.
+### STANDARDIZED SCORING CALIBRATION RUBRIC (0.0 to 10.0 scale for ${experienceLevel} Baseline):
+${rubricText}
+
+### ADAPTIVE SCORING RULES:
+1. **Anchor on Declared Level**: Evaluate the candidate against the rubric for their declared level (${experienceLevel}).
+2. **Reward Successful Stretch**: If Alex probed upward into more complex questions and the candidate handled them well, award a higher score (8.0+) and praise this in the summary.
+3. **Fairness on Stretch Failures**: A Junior who attempts an advanced Senior question and misses it should NOT be penalized heavily if their fundamental answers were solid.
+4. **Observed vs Declared Calibration**: In the summary, mention the candidate's observed capability level (e.g., "Declared: Junior | Observed: Strong Mid-level capability").
 
 ### EVALUATION CRITERIA:
-1. **Technical Accuracy**: Did the candidate state correct technical facts, protocols, and time/space complexities? Penalize incorrect claims.
-2. **Problem Solving & Trade-offs**: Did they reason through constraints, or just give rigid dogmatic answers?
-3. **Engineering Depth vs. Buzzword Evasion**: Did the candidate explain the *underlying mechanism* (e.g. how locking works, how cache invalidation behaves, how WebSockets buffer), or did they just drop tool names (Kafka, Redis, AI) without understanding?
-4. **Communication**: Was the candidate concise, structured, and direct?
+${categoryDescriptions}
 
 ### OUTPUT FORMAT:
 Respond with ONLY a valid JSON object strictly matching this schema:
 {
   "overallScore": number (0-10, one decimal precision),
   "recommendation": "Strong Hire" | "Hire" | "Lean Hire" | "No Hire",
-  "summary": "string (2-3 sentences executive summary)",
+  "summary": "string (2-3 sentences executive summary including observed level)",
   "categories": {
     "technicalAccuracy": { "score": number, "feedback": "string" },
     "problemSolving": { "score": number, "feedback": "string" },
@@ -135,7 +200,7 @@ Respond with ONLY a valid JSON object strictly matching this schema:
   "strengths": ["string", "string", "string"],
   "improvements": ["string", "string", "string"],
   "evidence": [
-    { "quote": "string (verbatim transcript excerpt)", "assessment": "string (technical observation)" }
+    { "quote": "string (verbatim transcript excerpt)", "assessment": "string (concrete observation)" }
   ]
 }`;
 

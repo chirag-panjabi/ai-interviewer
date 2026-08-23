@@ -135,6 +135,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
       let hasValidRepos = false;
       let candidateProfileSummary = "No public GitHub repositories or profile details provided.";
       let candidateDisplayName = "Candidate";
+      let chosenRepoName: string | null = null;
 
       if (interview.githubMetadata) {
         try {
@@ -146,15 +147,16 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
           const rawName = meta.name || meta.username || "Candidate";
           candidateDisplayName = rawName.split(/[-_]/)[0] || rawName;
 
-          const chosenRepoName = meta.selectedRepo || null;
+          chosenRepoName = meta.selectedRepo || null;
 
           if (Array.isArray(meta.repos) && meta.repos.length > 0) {
             hasValidRepos = true;
             
             // If candidate explicitly chose a repo, place it first in the list
             const sortedRepos = [...meta.repos];
-            if (chosenRepoName) {
-              const idx = sortedRepos.findIndex((r: any) => r.name.toLowerCase() === chosenRepoName.toLowerCase());
+            const activeTargetRepo = chosenRepoName;
+            if (activeTargetRepo) {
+              const idx = sortedRepos.findIndex((r: any) => r.name.toLowerCase() === activeTargetRepo.toLowerCase());
               if (idx > 0) {
                 const [target] = sortedRepos.splice(idx, 1);
                 if (target) sortedRepos.unshift(target);
@@ -274,8 +276,8 @@ ${transcriptHistory}
 
             const openingTurnText = isResumingSession
               ? `Alex, my internet connection dropped for a moment, but I am reconnected now. Please continue the interview from where we left off.`
-              : (hasValidRepos
-                  ? `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
+              : (chosenRepoName
+                  ? `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question based on my featured GitHub project "${chosenRepoName}".`
                   : `Hello Alex! I am ready for the interview screen. Please introduce yourself and ask your first question.`);
 
             geminiWs?.send(

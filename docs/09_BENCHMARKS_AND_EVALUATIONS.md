@@ -170,3 +170,66 @@ bun run test:evals
 bun run check-types
 cd ../frontend && bunx tsc --noEmit
 ```
+
+---
+
+## 7. Comprehensive Glossary & Terminology Index
+
+This glossary explains all technical shortforms, latency metrics, audio engineering concepts, and evaluation terms used throughout this document.
+
+### A. Voice & Audio Signal Processing
+
+| Term / Acronym | Plain English Meaning | Why It Is Used in AI Technical Interviewer |
+| :--- | :--- | :--- |
+| **PCM (Pulse Code Modulation)** | Raw, uncompressed digital audio representation created by sampling an analog sound wave at uniform intervals. | Used because raw PCM avoids encoding/decoding latency (unlike MP3/AAC) and is natively consumed by Gemini Live and the browser's Web Audio API. |
+| **Int16 (16-bit Signed Integer)** | Audio sample format where each sound pressure measurement is stored as a 16-bit integer (range $-32,768$ to $+32,767$). | Used for microphone audio chunks sent upstream to Gemini (`16kHz Int16 Mono PCM`) to minimize payload bandwidth ($32\text{ KB/s}$). |
+| **Float32 (32-bit Floating Point)** | Audio sample format where sound amplitude is normalized between $-1.0$ and $+1.0$. | The native internal format of browser `AudioContext` buffers used for client-side EQ visualization and downsampling. |
+| **16kHz vs. 24kHz Sample Rate** | Number of audio samples captured per second ($16,000\text{ samples/sec}$ vs. $24,000\text{ samples/sec}$). | **16kHz** is the industry standard for speech recognition (human voice fundamental frequency fits well under 8kHz Nyquist cutoff); **24kHz** is used for AI output voice to provide natural, warm acoustic clarity. |
+| **VAD (Voice Activity Detection)** | An algorithmic module (running client or server-side) that continuously detects whether audio contains human speech or background noise. | Used by Gemini Live to automatically detect when the candidate starts speaking and when they finish their turn. |
+| **Silence Hangover / Debounce Window** | A deliberate delay (e.g. $250\text{–}350\text{ms}$) the AI waits after sound stops before concluding the speaker is done. | Prevents the AI from rudely cutting off candidates when they pause briefly to take a breath or think between words. |
+| **RMS (Root Mean Square)** | A mathematical calculation measuring the effective energy/power (volume amplitude) of an audio signal over a time window. | Used on the frontend to drive the real-time VoiceOrb equalizer visualizer and detect client-side barge-in speech onset. |
+| **Barge-In Interruption** | The capability for a human to speak over the AI and immediately cut off the AI's ongoing audio playback. | Recreates natural human conversation; instantly mutes and drains scheduled audio buffers when the candidate begins speaking. |
+| **`ScriptProcessorNode`** | Legacy Web Audio API node that executes audio processing callbacks on the browser's main UI JavaScript thread. | Used in the current version for 100% universal cross-browser compatibility across older iOS Safari and Android WebViews. |
+| **`AudioWorkletNode`** | Modern Web Audio API interface that runs custom DSP (digital signal processing) on a dedicated background audio rendering thread. | Target roadmap architecture to isolate audio streaming from heavy React DOM re-rendering. |
+
+---
+
+### B. Latency, Networking & Statistical Benchmarks
+
+| Metric / Term | Plain English Meaning | Why It Is Used in AI Technical Interviewer |
+| :--- | :--- | :--- |
+| **TTFA (Time To First Audio)** | Milliseconds elapsed from the moment a turn transition is triggered until the first audible sound chunk is played. | The primary North Star latency metric for conversational voice AI systems. |
+| **TTFT (Time To First Token)** | Milliseconds elapsed until an LLM produces its first text character/token. | Used in legacy text LLMs; TTFA is the voice-native equivalent of TTFT. |
+| **P50 / Median Latency** | 50th percentile: $50\%$ of all requests were faster than this number. Represents the typical user experience. | Proves that the typical conversational turn feels instantaneous ($\sim 286\text{ms}$). |
+| **P90 / P95 / P99 (Tail Latency)** | 90th/95th/99th percentiles: Measures the worst-case $10\%$, $5\%$, and $1\%$ slowest requests. | In distributed voice systems, averages hide lag spikes; percentiles guarantee performance under temporary network jitter. |
+| **Turnaround Time (TAT)** | Total roundtrip time from the server deciding to respond to the audio reaching the candidate's speaker. | Quantifies pipeline efficiency excluding the biological human thinking pause. |
+| **Perceived Conversational Gap** | Total wall-clock time from the candidate stopping physical speech to hearing the AI response ($\text{VAD} + \text{TAT}$). | Reflects the real human experience of conversation ($500\text{–}650\text{ms}$, closely matching human-to-human interaction). |
+| **RTT (Round-Trip Time)** | Time taken for a network packet to travel from sender to destination and back. | Critical for tuning WebSocket transport across different geographic regions (e.g. US Edge vs. APAC). |
+
+---
+
+### C. System Architecture & AI Pipeline Models
+
+| Term / Acronym | Plain English Meaning | Why It Is Used in AI Technical Interviewer |
+| :--- | :--- | :--- |
+| **Native Multimodal Audio** | An AI architecture where audio is directly tokenized and generated by the neural network without intermediate text conversion. | Used by Gemini Live (`gemini-3.1-flash-live-preview`) to eliminate serialized STT $\rightarrow$ LLM $\rightarrow$ TTS latency and retain emotional tone. |
+| **Cascaded Voice Pipeline** | A traditional 3-step voice AI stack: ASR engine $\rightarrow$ Text LLM $\rightarrow$ TTS voice synthesizer. | The legacy approach that causes $>1.5\text{s}$ delays and high per-minute API costs; bypassed by this project. |
+| **ASR / STT** | Automated Speech Recognition / Speech-to-Text (converts spoken voice into text characters). | Transcribes candidate voice turns asynchronously for post-interview evaluation dossiers. |
+| **TTS (Text-to-Speech)** | Voice synthesis model that converts written text into spoken audio waveforms. | Replaced by Gemini's native audio generation during live calls. |
+| **BYOK (Bring Your Own Key)** | Architectural security model where users supply their own Google Gemini API key. | Allows users to conduct unlimited free interviews without hitting hosted cloud IP demo quotas; keys are stored client-side only. |
+| **WAL (Write-Ahead Logging)** | Database durability pattern where changes are recorded sequentially to disk before being written to storage tables. | Used as a core senior systems design probing topic (testing candidate knowledge on PostgreSQL disk I/O bottlenecks). |
+| **Idempotency Keys** | Unique request identifiers that ensure duplicate network requests do not perform duplicate actions. | Tested in system design scenarios (e.g. webhook delivery pipelines and payment ledgers). |
+
+---
+
+### D. Prompt Engineering & Evaluation Rubrics
+
+| Concept / Invariant | Plain English Meaning | Why It Is Used in AI Technical Interviewer |
+| :--- | :--- | :--- |
+| **2-Sentence Spoken Cadence** | Rule requiring the interviewer to speak in exactly 2 sentences (Micro-Grounding + Probing Question). | Prevents AI monologues, keeps candidate airtime $\gt 80\%$, and minimizes audio barge-in collisions. |
+| **Signal Saturation Principle** | Probing guideline: continue drilling a technical topic only while new architectural signal emerges, then pivot to another dimension. | Replaces rigid probe counters, ensuring both deep component drilling and broad stack coverage. |
+| **Technical Competency Gating** | Evaluation rule: if candidate technical accuracy is low ($<4.5/10$), the overall recommendation cannot exceed `Lean No Hire`. | Prevents articulate/charismatic non-technical candidates from receiving false hire recommendations. |
+| **Anti-Spoonfeeding Invariant** | Evaluation rule: zero technical depth credit is awarded if the interviewer supplied the solution or named the pattern first. | Ensures candidate score reflects genuine personal mastery rather than passive agreement with interviewer hints. |
+| **Reverse Q&A Non-Attribution** | Invariant ensuring that technical depth explained by the interviewer during Phase 5 Q&A is never credited to the candidate. | Prevents evaluation hallucination where the candidate gets credit for the company architecture explained by Alex. |
+| **STAR Method** | Structured behavioral interview framework: Situation, Task, Action, Result. | The benchmark standard used to grade leadership, accountability, and production post-mortem responses in Phase 4. |
+

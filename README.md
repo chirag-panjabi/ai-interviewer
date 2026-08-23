@@ -78,17 +78,20 @@ flowchart TD
 - **80/20 Airtime Ratio**: Eliminates lengthy AI monologues that cause candidate audio barge-in drops in WebRTC/WebSocket streams.
 
 ### 3. 🧠 Universal Dynamic Track Depth Generator
+- **Featured 360° Full Mock Interview Screen (`FULL_MOCK_SCREEN`)**:
+  - Simulates a real-world FAANG/Tier-1 interview cycle: 60s Intro $\rightarrow$ Flagship Project Deep-Dive $\rightarrow$ Live System Design Scenario $\rightarrow$ Behavioral Leadership $\rightarrow$ Candidate Reverse Q&A.
+- **8 Specialized Technical Domain Tracks**:
+  - Full-Stack, Backend, Frontend, System Design, DSA, Behavioral, DevOps & Cloud, and ML/AI.
 - **Multi-Layer Depth Drill-Down**: 
   1. *Layer 1 (The Decision)*: Why this architecture/pattern over alternatives?
   2. *Layer 2 (The Mechanics)*: Low-level engine internals, indexes, locks, memory layouts.
   3. *Layer 3 (Production Pressures)*: 10x traffic surges, network partitions, cascading failures.
-- **Universal Custom Track Support**: Dynamically generates 3-layer depth drill trees for any arbitrary track without hardcoded fallbacks.
 
 ### 4. ⚖️ Dynamic First-Principles Master Evaluator
 - Evidence-based evaluator enforcing 4 First Principles:
   1. **Anti-Spoonfeeding Invariant**: 0 credit if the interviewer named the tool or completed the candidate's sentence.
-  2. **Mechanical Depth vs. Buzzwords**: Differentiates surface buzzwords from underlying storage/network/memory mechanics.
-  3. **Precision & Inaccuracy Penalties**: Docks severe technical errors or hallucinations into the 0.0 – 2.5 range.
+  2. **Technical Competency Gate**: If `technicalAccuracy < 4.5`, the recommendation is capped at `Lean No Hire` / `No Hire`.
+  3. **Mechanical Depth vs. Buzzwords**: Differentiates surface buzzwords from underlying storage/network/memory mechanics.
   4. **Zero Participation Praise**: `strengths: []` when standards are not met.
 
 ### 5. 🎙️ 100% Free-Tier Multimodal Voice Architecture
@@ -106,6 +109,7 @@ flowchart TD
 
 | Technical Focus Track | Primary Architectural Focus & Evaluation Drill |
 | :--- | :--- |
+| **⭐ Full Mock Interview Screen** | **Flagship 360° Simulation**: 60s Intro $\rightarrow$ Flagship Project Deep-Dive $\rightarrow$ Live System Scenario $\rightarrow$ Behavioral $\rightarrow$ Candidate Reverse Q&A |
 | **Full-Stack General** | End-to-end API lifecycle, state management, cache hierarchies, database schema design, and full-stack performance |
 | **Backend Engineering** | Concurrency, REST/gRPC API contracts, DB indexing, storage engines (LSM/B-Tree), message queues, and distributed locks |
 | **Frontend Engineering** | Component architecture, Core Web Vitals (LCP/INP/CLS), SSR/hydration, state machines, and DOM rendering mechanics |
@@ -219,10 +223,11 @@ GENERAL_API_RATE_LIMIT_PER_MIN=100
 
 ### 3. Initialize the Database Schema
 
-Run Prisma to push the database schema to your PostgreSQL instance:
+Run Prisma to generate the TypeScript client and push the database schema to your PostgreSQL instance:
 
 ```bash
 cd apps/backend
+bunx prisma generate
 bunx prisma db push
 cd ../..
 ```

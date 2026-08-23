@@ -143,6 +143,10 @@ export function Result() {
         if (data.status === "COMPLETED" || data.status === "Done") {
           setLoading(false);
           if (intervalId) clearInterval(intervalId);
+        } else if (data.status === "FAILED") {
+          setFetchError("Evaluation encountered an issue while grading. Click retry to regenerate your scorecard.");
+          setLoading(false);
+          if (intervalId) clearInterval(intervalId);
         }
       } catch (err: any) {
         console.error("Error fetching results:", err);

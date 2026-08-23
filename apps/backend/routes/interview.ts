@@ -249,7 +249,13 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       status: "COMPLETED",
     });
   } catch (err: any) {
-    console.error("Error evaluating interview:", err);
-    res.status(500).json({ message: "Evaluation failed", error: err.message });
+    console.error(`[Result] Error evaluating interview ${interviewId}:`, err?.message || err);
+    await prisma.interview
+      .update({
+        where: { id: interviewId },
+        data: { status: "FAILED" },
+      })
+      .catch(() => {});
+    res.status(500).json({ message: "Evaluation failed", error: err?.message || "Unknown error" });
   }
 });

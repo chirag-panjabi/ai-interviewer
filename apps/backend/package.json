@@ -34,6 +34,8 @@
   "scripts": {
     "dev": "bun --watch index.ts",
     "start": "bun index.ts",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test:prompts": "bun run tests/promptInvariants.test.ts",
+    "test:evals": "bun run tests/evaluationDossiers.test.ts"
   }
 }

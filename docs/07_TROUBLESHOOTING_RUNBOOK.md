@@ -122,9 +122,15 @@ cd apps/backend && bunx prisma generate && bunx prisma db push
 # 5. Check backend TypeScript build
 cd apps/backend && bun build --target node ./index.ts --outfile /dev/null
 
-# 6. Check frontend TypeScript compilation
+# 6. Run prompt invariant regression suite
+cd apps/backend && bun run test:prompts
+
+# 7. Run evaluation dossier calibration suite
+cd apps/backend && bun run test:evals
+
+# 8. Check frontend TypeScript compilation
 cd apps/frontend && bunx tsc --noEmit
 
-# 7. Build frontend production distribution
+# 9. Build frontend production distribution
 cd apps/frontend && bun run build
 ```

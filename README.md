@@ -30,7 +30,7 @@ flowchart TD
     subgraph Server["Backend Server (Bun + Express 5 + WebSocket Relay)"]
         RESTRouter["REST API Router (/api/v1/*)<br/>(GitHub Scraper, Key Verifier, Session Init)"]
         WSServer["WebSocket Gateway (/api/v1/live/:id)<br/>(Heartbeat, Barge-in Relay, Stream Sync)"]
-        PromptEngine["Prompt Engine (promptBuilder.ts)<br/>(2-Sentence Cadence & 4-Layer Depth Drill)"]
+        PromptEngine["Prompt Engine (promptBuilder.ts)<br/>(2-Sentence Cadence & 3-Layer Depth Drill)"]
         EvalEngine["Evaluation Service (evaluation.ts)<br/>(Dynamic First-Principles Rubric Analysis)"]
         RateLimiter["Adaptive Rate Limiter<br/>(Configurable Demo Quotas & IP Protection)"]
         DB[(PostgreSQL + Prisma ORM)]
@@ -64,10 +64,10 @@ flowchart TD
 ## ✨ Key Engineering Highlights
 
 ### 1. 🎯 Interactive GitHub Repository & Flagship Grounding
-- **Flexible 3-Way Project Selection**:
+- **Flexible 4-Way Project Selection**:
   - **Direct Repo URL**: Paste `https://github.com/username/project` or `username/project` to auto-detect the candidate and target repository.
   - **Interactive Project Cards**: View top starred repositories with star counts, primary language tags, and project descriptions.
-  - **Custom Repo Option**: Enter any public repository name via `"➕ Other Public Repo..."`.
+  - **Custom Repo Option**: Enter any public repository name via `"+ Target Other Repository..."`.
   - **General Domain Screen**: Skip project-specific questions and jump straight into domain engineering scenarios.
 - **In-Memory LRU Cache (10-min TTL)**: Prevents hitting GitHub unauthenticated rate limits (60 req/hr).
 - **Targeted README Ingestion**: Sanitizes the chosen project's README (up to 2,000 chars) and isolates it inside `<untrusted_candidate_repo_context>` for prompt injection defense.
@@ -82,7 +82,7 @@ flowchart TD
   1. *Layer 1 (The Decision)*: Why this architecture/pattern over alternatives?
   2. *Layer 2 (The Mechanics)*: Low-level engine internals, indexes, locks, memory layouts.
   3. *Layer 3 (Production Pressures)*: 10x traffic surges, network partitions, cascading failures.
-- **Universal Custom Track Support**: Dynamically generates 4-layer depth drill trees for any arbitrary track without hardcoded fallbacks.
+- **Universal Custom Track Support**: Dynamically generates 3-layer depth drill trees for any arbitrary track without hardcoded fallbacks.
 
 ### 4. ⚖️ Dynamic First-Principles Master Evaluator
 - Evidence-based evaluator enforcing 4 First Principles:
@@ -288,11 +288,12 @@ cd apps/frontend && bunx tsc --noEmit && bun run build
 ## 📄 Resume Project Description
 
 ```text
-AI Technical Interview Platform | React 19, Bun, Express 5, PostgreSQL, Prisma, Gemini Multimodal Live API
-• Engineered a real-time voice interview platform leveraging Gemini Live API (gemini-3.1-flash-live-preview) for zero-cost, sub-second latency audio-to-audio conversations.
-• Designed Web Audio API client pipeline handling 16kHz PCM mic capture, gapless 24kHz audio playback, mic mute controls, and instant barge-in interruption draining.
-• Implemented an interactive GitHub repository selector with direct repo URL parsing, preview caching, and targeted README architecture grounding.
-• Architected a 2-sentence voice cadence formula and a dynamic First-Principles evaluation engine across 8 technical tracks and 3 seniority levels.
+AI Technical Interview Platform | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API
+• Engineered a production-grade multimodal voice screening platform utilizing Google Gemini Live API (gemini-3.1-flash-live-preview) for bidirectional, zero-cost, sub-350ms P95 latency audio conversations.
+• Architected a low-latency Web Audio API pipeline with 16kHz Int16 PCM microphone streaming, gapless 24kHz audio buffer scheduling, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
+• Built an interactive GitHub repository ingestion engine featuring URL auto-detection, a 10-minute TTL in-memory LRU cache, and prompt-injection-isolated README architecture extraction across 8 specialized domains.
+• Implemented a strict 2-sentence conversational cadence formula and an automated First-Principles evaluator enforcing anti-spoonfeeding invariants, mechanical depth scoring, and structured rubric synthesis.
+• Designed a 2-tier rate limiting & BYOK security architecture with configurable daily IP demo quotas and zero-persistence client-side API key encryption.
 ```
 
 ---

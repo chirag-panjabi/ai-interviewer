@@ -72,27 +72,33 @@ flowchart TD
 - **In-Memory LRU Cache (10-min TTL)**: Prevents hitting GitHub unauthenticated rate limits (60 req/hr).
 - **Targeted README Ingestion**: Sanitizes the chosen project's README (up to 2,000 chars) and isolates it inside `<untrusted_candidate_repo_context>` for prompt injection defense.
 
-### 2. 🗣️ Strict 2-Sentence Conversational Cadence Formula
+### 2. 🗣️ Strict 2-Sentence Conversational Cadence & Audio Invariants
 - **Sentence 1 (Micro-Grounding $\le 8$ words)**: Brief natural reaction acknowledging the candidate's last point *(e.g., "Understood on the Redis Lua approach.")*.
 - **Sentence 2 (Probing Question)**: Exactly ONE direct, un-spoiled question targeting mechanics, trade-offs, or failure modes.
+- **Cadence Boundaries & Exceptions**: Standard drill turns strictly enforce 2 sentences; Live scenario setup allows up to 3 crisp sentences; Boundary states (contemplation pauses, audio checks) allow a single short phrase (*"Take your time."*, *"Loud and clear."*) with zero trailing questions.
 - **80/20 Airtime Ratio**: Eliminates lengthy AI monologues that cause candidate audio barge-in drops in WebRTC/WebSocket streams.
 
-### 3. 🧠 Universal Dynamic Track Depth Generator
+### 3. 🧠 Universal Dynamic Track Depth Generator & Adaptive Invariants
 - **Featured 360° Full Mock Interview Screen (`FULL_MOCK_SCREEN`)**:
   - Simulates a real-world FAANG/Tier-1 interview cycle: 60s Intro $\rightarrow$ Flagship Project Deep-Dive $\rightarrow$ Live System Design Scenario $\rightarrow$ Behavioral Leadership $\rightarrow$ Candidate Reverse Q&A.
-- **8 Specialized Technical Domain Tracks**:
+- **8 Specialized Technical Domain Tracks with Seeded Scenario Archetypes**:
   - Full-Stack, Backend, Frontend, System Design, DSA, Behavioral, DevOps & Cloud, and ML/AI.
-- **Multi-Layer Depth Drill-Down**: 
-  1. *Layer 1 (The Decision)*: Why this architecture/pattern over alternatives?
-  2. *Layer 2 (The Mechanics)*: Low-level engine internals, indexes, locks, memory layouts.
-  3. *Layer 3 (Production Pressures)*: 10x traffic surges, network partitions, cascading failures.
+- **Signal Saturation & Breadth Balancing Principle**:
+  - Drills deeply into a sub-system while new technical signal emerges, then dynamically pivots across architectural dimensions (storage $\rightarrow$ concurrency $\rightarrow$ failure blast radius $\rightarrow$ event streaming) without rigid turn limits.
+- **Anti-Assistant Anchor & Persona Armor**:
+  - Anchors Alex strictly as an **Evaluator & Interviewer**, not a tutor, mentor, or helpful assistant, preventing monologue tutoring while deflecting prompt injection attempts.
+- **Fluff & Dodge Penetration**:
+  - Redirects non-technical corporate platitudes (*"we followed agile best practices"*) into concrete database schemas, lock mechanisms, and concurrency primitives.
+- **Voice-First DSA & ASR Phonetic Normalization**:
+  - Focuses algorithmic discussions on invariants, bounds, and state machines while intelligently mapping STT typos (*"post grass"*, *"battery"*, *"TRPC"*) to underlying engineering concepts.
 
 ### 4. ⚖️ Dynamic First-Principles Master Evaluator
-- Evidence-based evaluator enforcing 4 First Principles:
+- Evidence-based evaluator enforcing 5 First Principles:
   1. **Anti-Spoonfeeding Invariant**: 0 credit if the interviewer named the tool or completed the candidate's sentence.
   2. **Technical Competency Gate**: If `technicalAccuracy < 4.5`, the recommendation is capped at `Lean No Hire` / `No Hire`.
   3. **Mechanical Depth vs. Buzzwords**: Differentiates surface buzzwords from underlying storage/network/memory mechanics.
-  4. **Zero Participation Praise**: `strengths: []` when standards are not met.
+  4. **Reverse Q&A Non-Attribution Invariant**: Never attributes the interviewer's technical answers to candidate mastery.
+  5. **Zero Participation Praise**: `strengths: []` when standards are not met.
 
 ### 5. 🎙️ 100% Free-Tier Multimodal Voice Architecture
 - **Gemini Multimodal Live API (`gemini-3.1-flash-live-preview`)**: Native audio-to-audio streaming with zero third-party STT/TTS costs.

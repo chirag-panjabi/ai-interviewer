@@ -63,20 +63,20 @@ flowchart LR
    - *Milestone 4 (Operational Realities & Leadership)*: Explores production constraints; pivots to hypothetical 50x traffic surge or single points of failure if candidate built solo.
    - *Milestone 5 (Reverse Q&A)*: Only entered after Milestones 1–4 are complete.
 
-5. **The 14 Critical Conversational Invariants (`promptBuilder.ts`)**:
+5. **The 14 Conversational Safeguards & Rules (`promptBuilder.ts`)**:
 
-| # | Conversational Invariant | Architectural Rationale & Implementation Detail |
+| # | Conversational Safeguard | Architectural Rationale & Implementation Detail |
 | :--- | :--- | :--- |
 | **1** | **Spoken Cadence Formula & Boundaries** | Standard drill turns follow a strict 2-sentence formula ($\le 10$ word Micro-Grounding + 1 Probing Question). Exceptions: Scenario Setup (up to 3 sentences) and Boundary states like contemplation/audio check (1 short phrase without trailing question). |
 | **2** | **One Question at a Time** | Zero compound questions. Alex asks one targeted question and yields the floor immediately. |
-| **3** | **Anti-Hand-Waving & Fluff Penetration** | If candidates give non-technical platitudes (*"we followed agile best practices and clean code"*), Alex immediately grounds the inquiry into specific database schemas, indexes, and concurrency controls. |
+| **3** | **Concrete Technical Grounding** | If candidates provide high-level generalizations (*"we followed agile best practices and clean code"*), Alex redirects the inquiry into specific database schemas, indexes, and concurrency controls. |
 | **4** | **Anti-Spoiling & Calibrated Affirmation** | Zero solution leaking or hint spoon-feeding. Validates sound engineering logic briefly (*"Good, that guarantees idempotency"*) before raising the bar. |
-| **5** | **Signal Saturation & Breadth Balancing** | Replaces rigid probe counts: drills deep into a component while new architectural signal emerges, then dynamically pivots across stack dimensions (caching $\rightarrow$ write path concurrency $\rightarrow$ failure blast radius $\rightarrow$ event streams). |
+| **5** | **Adaptive Depth & Breadth Probing** | Replaces rigid probe counts: drills into a component while new architectural signal emerges, then dynamically pivots across stack dimensions (caching $\rightarrow$ write path concurrency $\rightarrow$ failure blast radius $\rightarrow$ event streams). |
 | **6** | **Voice-First Algorithmic Scaffolding** | In DSA tracks over audio: focuses on problem constraints, data structure trade-offs, Big-O bounds, and high-level invariants rather than line-by-line syntax recitation. |
 | **7** | **ASR Phonetic Normalization** | Intelligently maps speech-to-text phonetic approximations (*"post grass"*, *"battery"*, *"TRPC"*, *"cooper netties"*) to underlying engineering concepts without calling out transcription typos. |
-| **8** | **Persona Armor & Anti-Assistant Anchor** | Alex is anchored strictly as an **Evaluator & Interviewer**, not a tutor, mentor, or helpful AI assistant. Deflects prompt injection and score extraction attempts while maintaining 100% Staff Engineer character. |
+| **8** | **Interviewer Role & Prompt Guardrails** | Alex is anchored strictly as an **Evaluator & Interviewer**, not a tutor, mentor, or helpful AI assistant. Deflects prompt injection and score extraction attempts while maintaining 100% Staff Engineer character. |
 | **9** | **Natural Audio & Boundary Handling** | Protects candidate thinking space (*"Take your time"*), filters conversational backchanneling (*"Yeah"*, *"Right"*), accommodates audio tests (*"Loud and clear"*), and respects mid-sentence interruptions. |
-| **10** | **Dead-End & Solo Project Pivot** | Negative/solo statements (*"built it alone"*, *"no blockers"*) never terminate the interview; Alex pivots to hypothetical 50x traffic surges, other candidate projects, or Milestone 3. |
+| **10** | **Solo Project & Edge-Case Pivoting** | Negative/solo statements (*"built it alone"*, *"no blockers"*) never terminate the interview; Alex pivots to hypothetical 50x traffic surges, other candidate projects, or Milestone 3. |
 | **11** | **Candidate Surprise & Extended Exploration** | If candidate asks *"Why did you switch?"*, Alex reassures with ample time and offers deeper technical scenario exploration. |
 | **12** | **Diversified Reverse Q&A Persona** | Staff Engineer responses on stack/architecture with varied, natural closing invitations rather than robotic repetitions. |
 | **13** | **Fluid Continuity & Anti-Premature Exit** | Alex never exits on passive remarks (*"Seems interesting"*); the exit instruction is only delivered when the candidate explicitly requests to finish. |
@@ -120,22 +120,22 @@ Declared Seniority Level:
 
 ---
 
-### C. Inviolable Evaluation Invariants
+### C. Core Evaluation Standards & Guardrails
 
-#### 1. The Technical Competency Gate
-> **Invariant**: If `technicalAccuracy < 4.5`, the overall hiring recommendation **MUST NOT** exceed **`Lean No Hire`** or **`No Hire`**, regardless of how articulate or charismatic the candidate was in their introductory storytelling or communication.
+#### 1. Technical Accuracy Threshold
+> **Standard**: If `technicalAccuracy < 4.5`, the overall hiring recommendation **MUST NOT** exceed **`Lean No Hire`** or **`No Hire`**, regardless of how articulate or charismatic the candidate was in their introductory storytelling or communication.
 
-#### 2. Anti-Spoonfeeding Invariant
+#### 2. Originator Attribution
 - The grading engine inspects **who originated each technical concept** in the transcript.
 - If the interviewer provided the solution or completed the candidate's sentence, the candidate receives **zero technical depth credit** for that concept.
 - For Junior candidates, positive credit is awarded for coachability only if they independently applied a subtle directional hint to solve the problem.
 
-#### 4. Reverse Q&A Non-Attribution Invariant
+#### 3. Reverse Q&A Candidate Isolation
 - In Phase 5 of a mock interview, the candidate asks questions and the interviewer answers.
 - The evaluation engine grades the **seniority and relevance of the candidate's questions** (e.g. asking about team deployment velocity vs trivial logistics).
 - The engine strictly **never attributes the technical depth or architecture explained by the interviewer to the candidate**.
 
-#### 5. Partial & Abbreviated Session Handling
+#### 4. Partial & Abbreviated Session Handling
 - Only phases that actually occurred in the transcript are graded. Unreached phases are not penalized as failures, and the observed scope is explicitly recorded in the executive summary.
 
 ---

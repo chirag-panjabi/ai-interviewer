@@ -63,51 +63,34 @@ flowchart TD
 
 ## ✨ Key Engineering Highlights
 
-### 1. 🎯 Interactive GitHub Repository & Flagship Grounding
-- **Flexible 4-Way Project Selection**:
-  - **Direct Repo URL**: Paste `https://github.com/username/project` or `username/project` to auto-detect the candidate and target repository.
-  - **Interactive Project Cards**: View top starred repositories with star counts, primary language tags, and project descriptions.
-  - **Custom Repo Option**: Enter any public repository name via `"+ Target Other Repository..."`.
-  - **General Domain Screen**: Skip project-specific questions and jump straight into domain engineering scenarios.
+### 1. 🎙️ Full-Duplex Multimodal Voice Architecture
+- **Direct Audio-to-Audio Streaming**: Utilizes Google's Gemini Live API (`gemini-3.1-flash-live-preview`) over bidirectional WebSockets, bypassing traditional 3-hop cascaded pipelines (STT $\rightarrow$ LLM $\rightarrow$ TTS) to achieve sub-350ms P95 turnaround.
+- **Low-Latency Audio Pipeline**: Captures 16kHz mono Int16 PCM via Web Audio API, resamples in real time, and schedules gapless 24kHz output buffers.
+- **Client-Side Barge-In Interruption**: Continuously monitors microphone RMS energy to instantly flush and cancel queued audio buffers when the candidate speaks.
+
+### 2. 🗣️ Conversational Engine & Cadence Control
+- **Structured 2-Sentence Turn Formula**:
+  - *Sentence 1 (Micro-Grounding $\le 8$ words)*: Brief acknowledgement of the candidate's last point.
+  - *Sentence 2 (Probing Question)*: Single focused technical question targeting mechanics, trade-offs, or failure modes.
+  - *Airtime Governance*: Keeps interviewer speech to $<20\%$ of session time, preventing AI monologues and audio packet collisions.
+- **Adaptive Depth & Breadth Probing**: Drills into sub-components while new technical signal is produced, then pivots across architectural dimensions (storage $\rightarrow$ concurrency $\rightarrow$ failure blast radius $\rightarrow$ event streams) to ensure comprehensive evaluation.
+- **Concrete Technical Grounding**: Redirects high-level abstractions (*"we followed agile best practices"*) into specific database schemas, lock mechanisms, and concurrency primitives.
+- **Voice Protocol & Boundary Handling**: Accommodates candidate contemplation pauses (*"Take your time"*), filters passive backchanneling (*"Yeah"*, *"Right"*), and normalizes phonetic speech-to-text approximations (*"post grass"* $\rightarrow$ PostgreSQL).
+
+### 3. 🎯 Repository Context Ingestion & Project Grounding
+- **4-Way Selection Workflow**: Supports direct GitHub repository URLs, top starred repository cards, custom repository names, or domain-only screens.
 - **In-Memory LRU Cache (10-min TTL)**: Prevents hitting GitHub unauthenticated rate limits (60 req/hr).
-- **Targeted README Ingestion**: Sanitizes the chosen project's README (up to 2,000 chars) and isolates it inside `<untrusted_candidate_repo_context>` for prompt injection defense.
+- **Sandboxed Context Extraction**: Sanitizes chosen project READMEs (up to 2,000 chars) and isolates them inside XML delimiters to prevent prompt injection.
 
-### 2. 🗣️ Strict 2-Sentence Conversational Cadence & Audio Invariants
-- **Sentence 1 (Micro-Grounding $\le 8$ words)**: Brief natural reaction acknowledging the candidate's last point *(e.g., "Understood on the Redis Lua approach.")*.
-- **Sentence 2 (Probing Question)**: Exactly ONE direct, un-spoiled question targeting mechanics, trade-offs, or failure modes.
-- **Cadence Boundaries & Exceptions**: Standard drill turns strictly enforce 2 sentences; Live scenario setup allows up to 3 crisp sentences; Boundary states (contemplation pauses, audio checks) allow a single short phrase (*"Take your time."*, *"Loud and clear."*) with zero trailing questions.
-- **80/20 Airtime Ratio**: Eliminates lengthy AI monologues that cause candidate audio barge-in drops in WebRTC/WebSocket streams.
+### 4. ⚖️ Objective Candidate Evaluation Engine
+- **Verbatim Evidence Grounding**: Generates structured JSON scorecards backed by direct transcript quotes across 4 core dimensions (Technical Accuracy, Problem Solving, Communication, Systems Depth).
+- **Technical Accuracy Threshold**: Automatically caps hiring recommendations at `Lean No Hire` / `No Hire` if core technical accuracy is below $4.5/10$, ensuring communication polish cannot override technical gaps.
+- **Originator Attribution**: Awards technical depth credit only when concepts originate from the candidate, ignoring interviewer-spoonfed answers.
+- **Candidate Q&A Isolation**: Isolates reverse Q&A turns so architectural explanations provided by the interviewer are not mistakenly credited to candidate knowledge.
 
-### 3. 🧠 Universal Dynamic Track Depth Generator & Adaptive Invariants
-- **Featured 360° Full Mock Interview Screen (`FULL_MOCK_SCREEN`)**:
-  - Simulates a real-world FAANG/Tier-1 interview cycle: 60s Intro $\rightarrow$ Flagship Project Deep-Dive $\rightarrow$ Live System Design Scenario $\rightarrow$ Behavioral Leadership $\rightarrow$ Candidate Reverse Q&A.
-- **8 Specialized Technical Domain Tracks with Seeded Scenario Archetypes**:
-  - Full-Stack, Backend, Frontend, System Design, DSA, Behavioral, DevOps & Cloud, and ML/AI.
-- **Signal Saturation & Breadth Balancing Principle**:
-  - Drills deeply into a sub-system while new technical signal emerges, then dynamically pivots across architectural dimensions (storage $\rightarrow$ concurrency $\rightarrow$ failure blast radius $\rightarrow$ event streaming) without rigid turn limits.
-- **Anti-Assistant Anchor & Persona Armor**:
-  - Anchors Alex strictly as an **Evaluator & Interviewer**, not a tutor, mentor, or helpful assistant, preventing monologue tutoring while deflecting prompt injection attempts.
-- **Fluff & Dodge Penetration**:
-  - Redirects non-technical corporate platitudes (*"we followed agile best practices"*) into concrete database schemas, lock mechanisms, and concurrency primitives.
-- **Voice-First DSA & ASR Phonetic Normalization**:
-  - Focuses algorithmic discussions on invariants, bounds, and state machines while intelligently mapping STT typos (*"post grass"*, *"battery"*, *"TRPC"*) to underlying engineering concepts.
-
-### 4. ⚖️ Dynamic First-Principles Master Evaluator
-- Evidence-based evaluator enforcing 5 First Principles:
-  1. **Anti-Spoonfeeding Invariant**: 0 credit if the interviewer named the tool or completed the candidate's sentence.
-  2. **Technical Competency Gate**: If `technicalAccuracy < 4.5`, the recommendation is capped at `Lean No Hire` / `No Hire`.
-  3. **Mechanical Depth vs. Buzzwords**: Differentiates surface buzzwords from underlying storage/network/memory mechanics.
-  4. **Reverse Q&A Non-Attribution Invariant**: Never attributes the interviewer's technical answers to candidate mastery.
-  5. **Zero Participation Praise**: `strengths: []` when standards are not met.
-
-### 5. 🎙️ 100% Free-Tier Multimodal Voice Architecture
-- **Gemini Multimodal Live API (`gemini-3.1-flash-live-preview`)**: Native audio-to-audio streaming with zero third-party STT/TTS costs.
-- **Native Barge-In Interruption Handling**: Instantly cuts off AI playback on the client when the candidate begins speaking.
-- **Web Audio API**: Client-side 16kHz PCM capture, 7-band equalizer amplitude bars, and gapless 24kHz buffer scheduling.
-
-### 6. 🛡️ 2-Tier Access & Configurable Demo Quotas
-- **Hosted Cloud Demo**: 1-click evaluation out of the box with configurable IP rate limits (`DEMO_DAILY_INTERVIEW_LIMIT=15`).
-- **Bring-Your-Own-Key (BYOK)**: Candidates can supply their personal free Google AI Studio key with live pre-flight key verification, client-only persistence, and zero rate limits.
+### 5. 🛡️ Security, Quota Management & BYOK
+- **Hosted Cloud Demo**: 1-click evaluation out of the box with configurable IP sliding-window rate limits (`DEMO_DAILY_INTERVIEW_LIMIT=15`).
+- **Bring-Your-Own-Key (BYOK)**: Supports candidate-provided Google AI Studio keys with live pre-flight validation, client-only persistence, and zero rate limits.
 
 ---
 
@@ -318,12 +301,12 @@ cd apps/frontend && bunx tsc --noEmit && bun run build
 
 ```text
 AI Technical Interviewer (Voice AI) | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API, WebSockets
-• Engineered a production-grade multimodal voice screening platform utilizing Gemini Live API (gemini-3.1-flash-live-preview) for bidirectional, zero-cost, sub-300ms latency audio conversations with zero external STT/TTS overhead.
-• Architected a high-throughput Web Audio API pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, 7-band parametric audio analysis, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
-• Built a stateful conversational engine enforcing a 2-sentence spoken cadence, adaptive signal-saturation depth probing, ASR phonetic normalization ("post grass" -> PostgreSQL), anti-assistant anchors, and dead-end pivots.
-• Developed an interactive GitHub context ingestion engine with auto-URL detection, 10-minute TTL LRU caching, and prompt-injection-isolated README architecture extraction across 8 specialized engineering tracks.
-• Designed an asynchronous First-Principles evaluation engine with technical competency gating (technicalAccuracy < 4.5 hard cap), anti-spoonfeeding verification, Reverse Q&A non-attribution, and structured JSON rubric generation.
-• Implemented a 2-tier security and access architecture supporting hosted demo IP sliding-window quotas and zero-persistence Bring-Your-Own-Key (BYOK) authentication with live pre-flight key verification.
+• Engineered a real-time voice technical screening platform with Gemini Live API (gemini-3.1-flash-live-preview) over WebSockets, achieving sub-350ms P95 turnaround latency without intermediate STT/TTS serialization.
+• Architected a Web Audio API streaming pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
+• Implemented a stateful conversational engine with structured 2-sentence turn cadence, adaptive depth-to-breadth probing, ASR phonetic normalization ("post grass" -> PostgreSQL), and thinking-pause detection.
+• Built a GitHub ingestion service with URL auto-detection, 10-minute TTL LRU caching, and sandboxed README context extraction across 8 specialized domain tracks.
+• Developed an automated evaluation service enforcing technical accuracy thresholds, evidence-grounded scoring from verbatim quotes, candidate Q&A isolation, and structured JSON rubric generation.
+• Designed a 2-tier access model supporting hosted demo IP sliding-window rate limits and zero-persistence Bring-Your-Own-Key (BYOK) authentication with pre-flight validation.
 ```
 
 ---

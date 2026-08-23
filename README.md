@@ -77,18 +77,24 @@ flowchart TD
 - **Concrete Technical Grounding**: Redirects high-level abstractions (*"we followed agile best practices"*) into specific database schemas, lock mechanisms, and concurrency primitives.
 - **Voice Protocol & Boundary Handling**: Accommodates candidate contemplation pauses (*"Take your time"*), filters passive backchanneling (*"Yeah"*, *"Right"*), and normalizes phonetic speech-to-text approximations (*"post grass"* $\rightarrow$ PostgreSQL).
 
-### 3. 🎯 Repository Context Ingestion & Project Grounding
+### 3. 🧠 Dynamic Multi-Track Depth Generator & Seniority Matrix
+- **Featured 360° Full Mock Loop (`FULL_MOCK_SCREEN`)**: Simulates a complete FAANG/Tier-1 interview cycle: 60s Intro $\rightarrow$ Flagship Project Deep-Dive $\rightarrow$ Live System Scenario $\rightarrow$ Behavioral $\rightarrow$ Candidate Reverse Q&A.
+- **8 Specialized Technical Tracks**: Full-Stack, Backend, Frontend, System Design, DSA, Behavioral, DevOps & Cloud, and ML/AI.
+- **Seeded Production Scenario Archetypes**: 27 real-world system challenges (e.g. multi-tenant rate limiters, distributed payment ledgers, zero-downtime database migrations, HNSW vector indexing) tailored dynamically by seniority level.
+- **3-Layer Depth Model**: Probes every topic across Architectural Decision $\rightarrow$ Under-the-Hood Mechanics (B-Trees, locks, event loops, WAL) $\rightarrow$ Production Pressures (10x traffic, network partitions, cascading failures).
+
+### 4. 🎯 Repository Context Ingestion & Project Grounding
 - **4-Way Selection Workflow**: Supports direct GitHub repository URLs, top starred repository cards, custom repository names, or domain-only screens.
 - **In-Memory LRU Cache (10-min TTL)**: Prevents hitting GitHub unauthenticated rate limits (60 req/hr).
 - **Sandboxed Context Extraction**: Sanitizes chosen project READMEs (up to 2,000 chars) and isolates them inside XML delimiters to prevent prompt injection.
 
-### 4. ⚖️ Objective Candidate Evaluation Engine
+### 5. ⚖️ Objective Candidate Evaluation Engine
 - **Verbatim Evidence Grounding**: Generates structured JSON scorecards backed by direct transcript quotes across 4 core dimensions (Technical Accuracy, Problem Solving, Communication, Systems Depth).
 - **Technical Accuracy Threshold**: Automatically caps hiring recommendations at `Lean No Hire` / `No Hire` if core technical accuracy is below $4.5/10$, ensuring communication polish cannot override technical gaps.
 - **Originator Attribution**: Awards technical depth credit only when concepts originate from the candidate, ignoring interviewer-spoonfed answers.
 - **Candidate Q&A Isolation**: Isolates reverse Q&A turns so architectural explanations provided by the interviewer are not mistakenly credited to candidate knowledge.
 
-### 5. 🛡️ Security, Quota Management & BYOK
+### 6. 🛡️ Security, Quota Management & BYOK
 - **Hosted Cloud Demo**: 1-click evaluation out of the box with configurable IP sliding-window rate limits (`DEMO_DAILY_INTERVIEW_LIMIT=15`).
 - **Bring-Your-Own-Key (BYOK)**: Supports candidate-provided Google AI Studio keys with live pre-flight validation, client-only persistence, and zero rate limits.
 

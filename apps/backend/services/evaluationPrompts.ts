@@ -43,8 +43,9 @@ ${transcriptFormatted}
 
 1. **PRINCIPLE OF UNPROMPTED INDEPENDENCE (ANTI-SPOONFEEDING INVARIANT)**:
    - Carefully examine WHO introduced each technical concept in the transcript.
-   - If the **INTERVIEWER** supplied the definition, suggested the tool, named the architectural pattern (e.g. Alex mentioned RAG, Alex explained train/val split, Alex suggested Redis/Kafka), or completed the candidate's sentence, the candidate MUST receive **ZERO technical depth credit** for that topic.
-   - Do NOT give points for a candidate merely agreeing ("Yes, right", "You told me yourself") with the interviewer's leading statements.
+   - **Full Spoon-feeding (Zero Credit across all levels)**: If the interviewer supplied the complete answer, wrote the core logic, or completed the candidate's sentence, the candidate MUST receive **ZERO technical depth credit** for that topic. Do NOT give points for passive agreement ("Yes, right", "Exactly").
+   - **Junior Coachability vs Spoon-feeding**: For ${experienceLevel === "JUNIOR" ? "**JUNIOR** candidates" : "Junior candidates"}, if the interviewer gave ONE subtle directional nudge on an edge case (e.g. pointer boundary or syntax) and the candidate **independently reasoned out the solution and applied feedback effectively**, award positive credit for learning velocity and coachability in problemSolving and communication.
+   - **Mid & Senior Autonomy**: For MID and SENIOR candidates, any reliance on implementation hints indicates performance below level.
 
 2. **PRINCIPLE OF MECHANICAL DEPTH VS. BUZZWORD RECITATION**:
    - Differentiate between reciting high-level buzzwords ("we used Redis and Kafka") and explaining under-the-hood execution mechanics (e.g. memory structures, B-Tree indexes, lock contention, cache stampede prevention, consumer offsets, event loops, network latency).
@@ -66,17 +67,17 @@ ${transcriptFormatted}
 ${
   experienceLevel === "JUNIOR"
     ? `**JUNIOR (0-2 Years) Baseline Bar**:
-- *Expectations*: Clean syntax, foundational data structures, request lifecycle understanding, basic debugging, error handling, and honest communication of technical boundaries.
-- *Passing Performance (4.6 - 6.5)*: Independently explains core stack concepts (e.g. REST conventions, component lifecycle, database queries, basic data cleaning) without interviewer hints.
+- *Expectations*: Clean syntax, foundational data structures, request lifecycle understanding, basic debugging, error handling, ability to incorporate directional feedback, and honest communication of technical boundaries.
+- *Passing Performance (4.6 - 6.5)*: Independently explains core stack concepts (e.g. REST conventions, component lifecycle, database queries, basic data cleaning) or demonstrates strong coachability by rapidly applying directional nudges to resolve edge cases.
 - *Failing Performance (0.0 - 2.5)*: Confused about client vs server boundaries, cannot write/trace basic logic, admits lack of core stack fundamentals, or introduces fabricated terms.`
     : experienceLevel === "SENIOR"
     ? `**SENIOR (5+ Years / Staff) Baseline Bar**:
-- *Expectations*: Distributed systems mastery, partition tolerance (CAP/PACELC), consensus protocols, storage engine internals (MVCC/WAL), failure blast radius containment, multi-region scale, zero-downtime migrations, and strategic engineering trade-offs.
-- *Passing Performance (6.6 - 8.5)*: Masterfully dissects distributed edge cases, multi-region replication lag, cache stampedes, and systemic failure containment with concrete numerical grounding.
-- *Failing Performance (0.0 - 4.5)*: Relies on surface buzzwords, cannot analyze distributed failure modes, lacks depth on database internals, or over-engineers without business justification.`
+- *Expectations*: Distributed systems mastery, partition tolerance (CAP/PACELC), consensus protocols, storage engine internals (MVCC/WAL), failure blast radius containment, multi-region scale, zero-downtime migrations, defending trade-offs under adversarial pressure, and strategic architectural judgment.
+- *Passing Performance (6.6 - 8.5)*: Masterfully dissects distributed edge cases, multi-region replication lag, cache stampedes, and systemic failure containment with concrete numerical grounding. Successfully defends architecture when the interviewer injects production chaos.
+- *Failing Performance (0.0 - 4.5)*: Relies on surface buzzwords, cannot analyze distributed failure modes under pushback, lacks depth on database internals, or over-engineers without business justification.`
     : `**MID-LEVEL (2-5 Years) Baseline Bar**:
-- *Expectations*: Production architecture, database indexing (B-Trees), caching patterns with explicit TTLs/invalidation, async worker queues, error boundaries, concurrency control, and clean API contracts.
-- *Passing Performance (4.6 - 6.5)*: Strong production intuition: independently designs clean API contracts, indexes database tables effectively, handles background queues, and reasons about edge cases.
+- *Expectations*: Production architecture, database indexing (B-Trees), caching patterns with explicit TTLs/invalidation, async worker queues, error boundaries, concurrency control, clean API contracts, and independent execution without hints.
+- *Passing Performance (4.6 - 6.5)*: Strong production intuition: independently designs clean API contracts, indexes database tables effectively, handles background queues, and reasons about edge cases without hand-waving.
 - *Failing Performance (0.0 - 2.5)*: Uses ORMs or frameworks blindly without understanding generated SQL or execution costs, cannot optimize slow queries, or ignores concurrency race conditions.`
 }
 
@@ -93,8 +94,8 @@ ${
 
 ### 4 EVALUATION CATEGORIES:
 1. **technicalAccuracy**: Correctness of concepts, syntax, APIs, database mechanics, protocols, and architectural models.
-2. **problemSolving**: Edge case handling, trade-off analysis, systematic reasoning under constraints, and failure mode mitigation.
-3. **communication**: Technical precision, structured articulation, conciseness, and clarity without trailing off.
+2. **problemSolving**: Edge case handling, trade-off analysis, systematic reasoning under constraints, defense under pushback, and failure mode mitigation.
+3. **communication**: Technical precision, structured articulation, conciseness, coachability (for juniors), and clarity without trailing off.
 4. **depth**: Underlying systems mastery (memory, latency, indexing, concurrency) vs superficial high-level terminology.
 
 ${
@@ -123,7 +124,7 @@ ${
 Respond with ONLY a valid, parseable JSON object matching this schema:
 {
   "overallScore": number (0.0 to 10.0, one decimal place),
-  "recommendation": "Strong Hire" | "Hire" | "Lean Hire" | "No Hire",
+  "recommendation": "Strong Hire" | "Hire" | "Lean Hire" | "Lean No Hire" | "No Hire",
   "summary": "string (3-4 comprehensive sentences detailing technical overview, reasoning depth, level calibration, and hiring justification. Must include: 'Declared: ${experienceLevel} | Observed: [Junior / Mid-Level / Senior / Unsatisfactory] capability.')",
   "categories": {
     "technicalAccuracy": {

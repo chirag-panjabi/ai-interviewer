@@ -15,7 +15,7 @@ export const EvidenceItemSchema = z.object({
 
 export const EvaluationResultSchema = z.object({
   overallScore: z.number().min(0).max(10),
-  recommendation: z.enum(["Strong Hire", "Hire", "Lean Hire", "No Hire"]),
+  recommendation: z.enum(["Strong Hire", "Hire", "Lean Hire", "Lean No Hire", "No Hire"]),
   summary: z.string().describe("High-level 2-3 sentence executive summary of candidate performance"),
   categories: z.object({
     technicalAccuracy: CategoryScoreSchema.describe("Evaluation of technical correctness, API knowledge, architecture"),

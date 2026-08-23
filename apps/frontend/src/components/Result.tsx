@@ -196,6 +196,16 @@ export function Result() {
           bg: "bg-amber-500/10 border-amber-500/40 text-amber-400",
           label: "Lean Hire",
         };
+      case "Lean No Hire":
+        return {
+          bg: "bg-orange-500/10 border-orange-500/40 text-orange-400",
+          label: "Lean No Hire",
+        };
+      case "No Hire":
+        return {
+          bg: "bg-rose-500/10 border-rose-500/40 text-rose-400",
+          label: "No Hire",
+        };
       default:
         return {
           bg: "bg-rose-500/10 border-rose-500/40 text-rose-400",

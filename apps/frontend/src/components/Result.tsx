@@ -1,4 +1,4 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Split-Dossier · theme: custom-carbon · states: default · hover · focus · active · disabled · loading */
+/* Hallmark · genre: modern-minimal · macrostructure: Executive-Dossier · theme: custom-carbon · states: default · hover · focus · active · disabled · loading */
 
 import { BACKEND_URL } from "@/lib/config";
 import { getCustomApiKey } from "@/lib/apiKeyStorage";
@@ -6,12 +6,9 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  Bot,
   Loader2,
-  User,
   CheckCircle2,
   AlertTriangle,
-  Award,
   Code2,
   Brain,
   MessageSquare,
@@ -24,10 +21,9 @@ import {
   Check,
   Radio,
   FileText,
-  Clock,
-  ShieldCheck,
   Plus,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -46,7 +42,7 @@ interface EvidenceItem {
 
 interface EvaluationData {
   overallScore: number;
-  recommendation: "Strong Hire" | "Hire" | "Lean Hire" | "No Hire";
+  recommendation: "Strong Hire" | "Hire" | "Lean Hire" | "Lean No Hire" | "No Hire";
   summary: string;
   categories: {
     technicalAccuracy: CategoryScore;
@@ -78,20 +74,20 @@ interface ResultData {
 }
 
 const TRACK_LABELS: Record<string, string> = {
-  FULLSTACK_GENERAL: "Full-Stack General",
+  FULLSTACK_GENERAL: "Full-Stack",
   BACKEND: "Backend Engineering",
   FRONTEND: "Frontend Engineering",
   SYSTEM_DESIGN: "System Design",
   DSA: "DSA & Algorithms",
   BEHAVIORAL: "Behavioral & Leadership",
   DEVOPS_CLOUD: "DevOps & Cloud",
-  ML_AI: "ML & AI Engineering",
+  ML_AI: "ML & AI Systems",
 };
 
 const LEVEL_LABELS: Record<string, string> = {
-  JUNIOR: "Junior · 0–2y",
-  MID: "Mid-Level · 2–5y",
-  SENIOR: "Senior · 5+y",
+  JUNIOR: "Junior",
+  MID: "Mid-Level",
+  SENIOR: "Senior / Lead",
 };
 
 function formatModelName(model?: string): string {
@@ -216,7 +212,6 @@ export function Result() {
 
   const recBadge = getRecommendationBadge(evalData?.recommendation);
 
-  // Filtered transcript messages with safe array fallback
   const transcriptList = Array.isArray(result?.transcript) ? result.transcript : [];
   const filteredTranscript = transcriptList.filter((m) => {
     const matchesRole = roleFilter === "all" || m.type === roleFilter;
@@ -265,9 +260,9 @@ export function Result() {
 
   return (
     <main className="min-h-screen w-full max-w-full px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-between">
-      <div className="mx-auto w-full max-w-6xl">
-        {/* Top Header Navigation & Action Rail */}
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/40 pb-4">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        {/* Minimal Hallmark Top Header */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/40 pb-4">
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -281,16 +276,17 @@ export function Result() {
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
-                  EVALUATION REPORT
+                  EVALUATION DOSSIER
                 </span>
-                <span className="rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground tabular-nums">
-                  SESSION #{interviewId ? interviewId.slice(-8) : "REF"}
-                </span>
+                {(levelLabel || trackLabel) && (
+                  <span className="rounded-md border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {levelLabel} · {trackLabel}
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Evaluated via <span className="font-medium text-foreground">{modelDisplayName}</span> standardized engineering rubric.
+                Evaluated via <span className="font-medium text-foreground">{modelDisplayName}</span> rubric
               </p>
             </div>
           </div>
@@ -364,356 +360,302 @@ export function Result() {
             </div>
           </div>
         ) : (
-          /* ASYMMETRIC 2-COLUMN SPLIT DOSSIER */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left">
-            {/* LEFT RAIL: Candidate Summary & Rubric Competencies (5 Cols) */}
-            <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
-              {/* Primary Scorecard Header Card */}
-              <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                      Overall Assessment
+          /* UNIFIED MINIMAL DOSSIER CONTENT */
+          <div className="space-y-6 text-left">
+            
+            {/* 1. Executive Assessment & Scorecard Card */}
+            <div className="rounded-2xl border border-border/80 bg-card/60 p-6 sm:p-7 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Overall Outcome
                     </span>
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      {evalData?.recommendation && (
-                        <span className={cn("rounded-lg border px-2.5 py-0.5 text-xs font-semibold", recBadge.bg)}>
-                          {recBadge.label}
-                        </span>
-                      )}
-                      {trackLabel && (
-                        <span className="rounded-lg border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {trackLabel}
-                        </span>
-                      )}
-                      {levelLabel && (
-                        <span className="rounded-lg border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {levelLabel}
-                        </span>
-                      )}
-                    </div>
                   </div>
-
-                  {/* Big Tabular Score */}
-                  <div className="text-right">
-                    <div className="flex items-baseline justify-end gap-1">
-                      <span className="text-4xl font-extrabold font-mono tabular-nums tracking-tight text-foreground">
-                        {evalData?.overallScore ?? result.score}
+                  <div className="flex items-center gap-2.5 pt-1">
+                    {evalData?.recommendation && (
+                      <span className={cn("rounded-lg border px-3 py-1 text-sm font-semibold", recBadge.bg)}>
+                        {recBadge.label}
                       </span>
-                      <span className="text-sm font-mono text-muted-foreground">/10</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">COMPOSITE SCORE</span>
+                    )}
+                    {levelLabel && (
+                      <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                        {levelLabel}
+                      </span>
+                    )}
+                    {trackLabel && (
+                      <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                        {trackLabel}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Rubric Category Breakdown Bars */}
-                {evalData?.categories && (
-                  <div className="mt-6 space-y-3.5 border-t border-border/40 pt-5">
-                    <span className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">
-                      Rubric Breakdown
-                    </span>
-                    <div className="space-y-3">
-                      {categoriesConfig.map((cat) => {
-                        const Icon = cat.icon;
-                        const pct = Math.min(100, Math.max(0, cat.score * 10));
-                        return (
-                          <div key={cat.key} className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="flex items-center gap-1.5 text-foreground font-medium">
-                                <Icon className="size-3.5 text-primary" />
-                                {cat.title}
-                              </span>
-                              <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
-                                {cat.score}
-                                <span className="text-[10px] font-normal text-muted-foreground">/10</span>
-                              </span>
-                            </div>
-                            {/* Visual Progress Bar */}
-                            <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
-                              <div
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-300",
-                                  cat.score >= 8
-                                    ? "bg-emerald-500"
-                                    : cat.score >= 6
-                                    ? "bg-primary"
-                                    : "bg-amber-500"
-                                )}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-baseline gap-1.5 sm:text-right">
+                  <span className="text-4xl sm:text-5xl font-extrabold font-mono tabular-nums tracking-tight text-foreground">
+                    {evalData?.overallScore ?? result.score}
+                  </span>
+                  <span className="text-base font-mono text-muted-foreground">/ 10</span>
+                </div>
               </div>
 
-              {/* Strengths & Focus Areas Card */}
-              {evalData && (
-                <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm space-y-5">
-                  {/* Strengths */}
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-                      <CheckCircle2 className="size-4" />
-                      Key Observed Strengths
-                    </div>
-                    <ul className="space-y-2">
-                      {evalData.strengths.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90 leading-relaxed">
-                          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-emerald-400" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Improvements */}
-                  <div className="space-y-2.5 border-t border-border/40 pt-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
-                      <AlertTriangle className="size-4" />
-                      Target Growth Areas
-                    </div>
-                    <ul className="space-y-2">
-                      {evalData.improvements.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90 leading-relaxed">
-                          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-amber-400" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT MAIN DECK: Summary, Deep Rubric Feedback, Evidence & Transcript (7 Cols) */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Executive Summary Box */}
-              <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground">
-                    <FileText className="size-3.5 text-primary" />
-                    Executive Evaluation Summary
-                  </span>
-                </div>
-                <p className="text-sm leading-relaxed text-foreground/90">
+              <div className="border-t border-border/40 pt-4">
+                <p className="text-sm sm:text-base text-foreground/90 leading-relaxed font-normal">
                   {evalData?.summary || result.feedback}
                 </p>
               </div>
+            </div>
 
-              {/* Detailed Competency Feedback Grid */}
-              {evalData?.categories && (
-                <div className="space-y-3">
-                  <span className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">
-                    Competency Notes & Diagnostics
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {categoriesConfig.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
-                        <div
-                          key={cat.key}
-                          className="rounded-xl border border-border/60 bg-card/40 p-4 space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                              <Icon className="size-3.5 text-primary" />
-                              {cat.title}
-                            </span>
-                            <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
-                              {cat.score}
-                              <span className="text-[10px] font-normal text-muted-foreground">/10</span>
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {cat.feedback}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Transcript Evidence Quotes */}
-              {evalData?.evidence && evalData.evidence.length > 0 && (
-                <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <Quote className="size-3.5 text-primary" />
-                    Transcript Evidence & Direct Quotes
-                  </div>
-                  <div className="space-y-2.5">
-                    {evalData.evidence.map((ev, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl border border-border/50 bg-background/50 p-3.5 space-y-1.5"
-                      >
-                        <p className="text-xs italic text-foreground font-mono">
-                          "{ev.quote}"
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-semibold text-foreground/90">Observation: </span>
-                          {ev.assessment}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Interactive Conversation Transcript */}
-              <div className="rounded-2xl border border-border/80 bg-card/60 p-6 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/40 pb-4">
-                  <div>
-                    <span className="text-xs font-semibold text-foreground">
-                      Full Audio Transcript
-                    </span>
-                    <p className="text-[11px] text-muted-foreground font-mono tabular-nums">
-                      {filteredTranscript.length} of {result.transcript.length} turns displayed
-                    </p>
-                  </div>
-
-                  {/* Transcript Controls */}
-                  <div className="flex flex-wrap items-center gap-2.5" data-no-print>
-                    {/* Responsive Search Input */}
-                    <div className="relative flex items-center group">
-                      <Search className="absolute left-2.5 size-3.5 text-muted-foreground pointer-events-none transition-colors group-focus-within:text-foreground" />
-                      <Input
-                        aria-label="Search interview transcript by keyword"
-                        placeholder="Search transcript..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-8 w-48 sm:w-56 focus-within:w-60 rounded-lg pl-8 pr-7 text-xs bg-background/70 border-border/70 placeholder:text-muted-foreground transition-all duration-200 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/60"
-                      />
-                      {searchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchQuery("")}
-                          aria-label="Clear search input"
-                          className="absolute right-2 size-4 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors duration-150 cursor-pointer"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Unified Segmented Speaker Rail */}
-                    <div
-                      role="tablist"
-                      aria-label="Filter transcript by speaker"
-                      className="flex h-8 items-center rounded-lg border border-border/70 bg-background/70 p-0.5 text-xs shadow-none"
-                    >
-                      <button
-                        role="tab"
-                        aria-selected={roleFilter === "all"}
-                        onClick={() => setRoleFilter("all")}
-                        className={cn(
-                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
-                          roleFilter === "all"
-                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        All
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={roleFilter === "Assistant"}
-                        onClick={() => setRoleFilter("Assistant")}
-                        className={cn(
-                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
-                          roleFilter === "Assistant"
-                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        Alex
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={roleFilter === "User"}
-                        onClick={() => setRoleFilter("User")}
-                        className={cn(
-                          "h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center",
-                          roleFilter === "User"
-                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        Candidate
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3.5 max-h-[600px] overflow-y-auto pr-1">
-                  {filteredTranscript.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-border/60 p-8 text-center text-xs text-muted-foreground">
-                      {result.transcript.length === 0
-                        ? "No conversation turns recorded."
-                        : "No dialog turns match your search filter."}
-                    </div>
-                  )}
-
-                  {filteredTranscript.map((m, i) => {
-                    const isAi = m.type === "Assistant";
+            {/* 2. 4-Pillar Engineering Rubric (Unified Competency Grid) */}
+            {evalData?.categories && (
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider">
+                  Engineering Competencies & Diagnostic Feedback
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {categoriesConfig.map((cat) => {
+                    const Icon = cat.icon;
+                    const pct = Math.min(100, Math.max(0, cat.score * 10));
                     return (
                       <div
-                        key={i}
-                        className={cn(
-                          "flex gap-3",
-                          isAi ? "justify-start" : "flex-row-reverse"
-                        )}
+                        key={cat.key}
+                        className="rounded-xl border border-border/70 bg-card/50 p-4 space-y-2.5"
                       >
-                        <div
-                          className={cn(
-                            "flex size-7 shrink-0 items-center justify-center rounded-lg border text-xs",
-                            isAi
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/80 bg-muted/40 text-foreground"
-                          )}
-                        >
-                          {isAi ? <Bot className="size-3.5" /> : <User className="size-3.5" />}
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                            <Icon className="size-3.5 text-primary" />
+                            {cat.title}
+                          </span>
+                          <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
+                            {cat.score}
+                            <span className="text-[10px] font-normal text-muted-foreground">/10</span>
+                          </span>
                         </div>
-                        <div
-                          className={cn(
-                            "max-w-[85%] rounded-xl p-3.5 text-xs leading-relaxed space-y-1",
-                            isAi
-                              ? "border border-border/60 bg-background/60 text-foreground"
-                              : "bg-primary text-primary-foreground font-normal"
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-3 text-[10px] opacity-70">
-                            <span className="font-semibold">{isAi ? "Alex (Interviewer)" : "Candidate"}</span>
-                            {m.turnIndex !== undefined && (
-                              <span className="font-mono tabular-nums">Turn #{m.turnIndex}</span>
+
+                        {/* Visual Progress Line */}
+                        <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-300",
+                              cat.score >= 8
+                                ? "bg-emerald-500"
+                                : cat.score >= 6
+                                ? "bg-primary"
+                                : "bg-amber-500"
                             )}
-                          </div>
-                          <p>{m.content}</p>
-                          {m.wasInterrupted && (
-                            <div className="pt-1">
-                              <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
-                                Interrupted by candidate
-                              </span>
-                            </div>
-                          )}
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed pt-0.5">
+                          {cat.feedback}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
               </div>
+            )}
+
+            {/* 3. Strengths & Target Growth (Side-by-Side 2-Col Grid) */}
+            {evalData && (evalData.strengths.length > 0 || evalData.improvements.length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Strengths */}
+                <div className="rounded-xl border border-border/70 bg-card/50 p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+                    <CheckCircle2 className="size-4" />
+                    Observed Strengths
+                  </div>
+                  <ul className="space-y-2">
+                    {evalData.strengths.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90 leading-relaxed">
+                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-400" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Improvements */}
+                <div className="rounded-xl border border-border/70 bg-card/50 p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+                    <AlertTriangle className="size-4" />
+                    Target Growth Opportunities
+                  </div>
+                  <ul className="space-y-2">
+                    {evalData.improvements.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-foreground/90 leading-relaxed">
+                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-400" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Transcript Evidence Quotes (if available) */}
+            {evalData?.evidence && evalData.evidence.length > 0 && (
+              <div className="rounded-xl border border-border/70 bg-card/50 p-5 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                  <Quote className="size-4 text-primary" />
+                  Key Evidence & Direct Transcript Quotes
+                </div>
+                <div className="space-y-2.5">
+                  {evalData.evidence.map((ev, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-lg border border-border/50 bg-background/50 p-3 space-y-1"
+                    >
+                      <p className="text-xs italic text-foreground font-mono">
+                        "{ev.quote}"
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/90">Assessment: </span>
+                        {ev.assessment}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Full Audio Transcript */}
+            <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/40 pb-4">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block">
+                    Full Audio Transcript
+                  </span>
+                  <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                    {filteredTranscript.length} of {result.transcript.length} dialog turns
+                  </span>
+                </div>
+
+                {/* Filter & Search Controls */}
+                <div className="flex flex-wrap items-center gap-2" data-no-print>
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-2.5 size-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      aria-label="Search transcript"
+                      placeholder="Filter transcript..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="h-8 w-44 sm:w-52 rounded-lg pl-8 pr-7 text-xs bg-background/70 border-border/70"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        aria-label="Clear search"
+                        className="absolute right-2 size-4 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div
+                    role="tablist"
+                    aria-label="Filter transcript by speaker"
+                    className="flex h-8 items-center rounded-lg border border-border/70 bg-background/70 p-0.5 text-xs"
+                  >
+                    <button
+                      role="tab"
+                      aria-selected={roleFilter === "all"}
+                      onClick={() => setRoleFilter("all")}
+                      className={cn(
+                        "h-7 rounded-md px-2.5 text-xs font-medium transition-colors cursor-pointer",
+                        roleFilter === "all"
+                          ? "bg-primary text-primary-foreground font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      All
+                    </button>
+                    <button
+                      role="tab"
+                      aria-selected={roleFilter === "Assistant"}
+                      onClick={() => setRoleFilter("Assistant")}
+                      className={cn(
+                        "h-7 rounded-md px-2.5 text-xs font-medium transition-colors cursor-pointer",
+                        roleFilter === "Assistant"
+                          ? "bg-primary text-primary-foreground font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Alex
+                    </button>
+                    <button
+                      role="tab"
+                      aria-selected={roleFilter === "User"}
+                      onClick={() => setRoleFilter("User")}
+                      className={cn(
+                        "h-7 rounded-md px-2.5 text-xs font-medium transition-colors cursor-pointer",
+                        roleFilter === "User"
+                          ? "bg-primary text-primary-foreground font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Candidate
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Clean Dialog Stream */}
+              <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
+                {filteredTranscript.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border/60 p-8 text-center text-xs text-muted-foreground">
+                    {result.transcript.length === 0
+                      ? "No conversation turns recorded."
+                      : "No dialog turns match your search filter."}
+                  </div>
+                )}
+
+                {filteredTranscript.map((m, i) => {
+                  const isAi = m.type === "Assistant";
+                  return (
+                    <div
+                      key={i}
+                      className={cn(
+                        "p-3.5 rounded-xl border space-y-1 text-left transition-colors",
+                        isAi
+                          ? "border-border/60 bg-background/40"
+                          : "border-primary/30 bg-primary/5"
+                      )}
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className={cn("font-semibold", isAi ? "text-primary" : "text-foreground")}>
+                          {isAi ? "Alex (Interviewer)" : "Candidate"}
+                        </span>
+                        {m.turnIndex !== undefined && (
+                          <span className="text-muted-foreground text-[10px]">Turn #{m.turnIndex}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-foreground/90 leading-relaxed font-normal">
+                        {m.content}
+                      </p>
+                      {m.wasInterrupted && (
+                        <span className="inline-block rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 mt-1">
+                          Interrupted by candidate
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Footer Colophon */}
-      <footer className="mt-12 text-center text-xs text-muted-foreground/70 pb-4">
-        <span>AI Technical Interviewer · Standardized Engineering Evaluation Dossier</span>
-      </footer>
+        {/* Minimal Colophon Footer */}
+        <footer className="mt-8 text-center text-xs text-muted-foreground/70 pb-4">
+          <p>
+            AI Technical Interviewer · Standardized Engineering Evaluation Dossier
+          </p>
+        </footer>
+      </div>
     </main>
   );
 }

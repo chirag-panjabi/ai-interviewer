@@ -27,6 +27,9 @@ import {
   Radio,
   Sparkles,
   ShieldCheck,
+  Plus,
+  Star,
+  FolderGit2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiKeyModal } from "./ApiKeyModal";
@@ -156,6 +159,8 @@ export function Form() {
   const [profilePreview, setProfilePreview] = useState<ProfilePreview | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  const [isCustomRepoMode, setIsCustomRepoMode] = useState(false);
+  const [customRepoInput, setCustomRepoInput] = useState("");
 
   const navigate = useNavigate();
   const timersRef = useRef<NodeJS.Timeout[]>([]);
@@ -250,8 +255,9 @@ export function Form() {
 
       if (repo) {
         setSelectedRepo(repo);
-      } else if (!selectedRepo && previewData.repos?.length > 0) {
-        setSelectedRepo(previewData.repos[0]?.name || null);
+        setIsCustomRepoMode(false);
+      } else if (!selectedRepo && !isCustomRepoMode && previewData.repos?.length > 0) {
+        setSelectedRepo(previewData.repos[0]?.name || "__ALL__");
       }
     } catch (err: any) {
       if (axios.isCancel(err)) return;
@@ -330,7 +336,15 @@ export function Form() {
     try {
       const customKey = getCustomApiKey();
 
-      const finalSelectedRepo = contextMode === "github" ? selectedRepo : null;
+      let finalSelectedRepo: string | null = null;
+      if (contextMode === "github") {
+        if (isCustomRepoMode && customRepoInput.trim()) {
+          finalSelectedRepo = customRepoInput.trim();
+        } else if (selectedRepo && selectedRepo !== "__ALL__") {
+          finalSelectedRepo = selectedRepo;
+        }
+      }
+
       const finalGithub = contextMode === "github" && github.trim() ? github.trim() : "candidate";
 
       const response = await axios.post(
@@ -365,6 +379,7 @@ export function Form() {
   return (
     <main className="w-full max-w-full min-h-screen px-4 py-8 sm:px-6 md:py-12 flex flex-col justify-between">
       <div className="mx-auto w-full max-w-3xl">
+        {/* Minimal Hallmark Top Nav */}
         <header className="mb-8 flex items-center justify-between border-b border-border/40 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -373,6 +388,11 @@ export function Form() {
                 AI INTERVIEWER
               </span>
             </div>
+            <span className="hidden sm:inline-block h-3.5 w-px bg-border/60" />
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Radio className="size-3 text-primary" />
+              Gemini Live Voice Engine
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -396,6 +416,7 @@ export function Form() {
           </div>
         </header>
 
+        {/* Clean Hero */}
         <section className="mb-8 text-center sm:text-left">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             AI Technical Interviewer
@@ -405,7 +426,10 @@ export function Form() {
           </p>
         </section>
 
+        {/* Unified Studio Card */}
         <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-7 shadow-sm space-y-6 text-left">
+          
+          {/* 1. Track Selector */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
               1. Choose Domain Track
@@ -446,6 +470,7 @@ export function Form() {
             </div>
           </div>
 
+          {/* 2. Seniority Level */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
               2. Seniority Level
@@ -484,6 +509,7 @@ export function Form() {
             </div>
           </div>
 
+          {/* 3. Interview Context (Progressive Disclosure) */}
           <div className="pt-2 border-t border-border/40">
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
               3. Interview Context (Optional)
@@ -495,6 +521,7 @@ export function Form() {
                 onClick={() => {
                   setContextMode("general");
                   setSelectedRepo(null);
+                  setIsCustomRepoMode(false);
                   setValidationError(null);
                 }}
                 disabled={loading}
@@ -519,10 +546,7 @@ export function Form() {
                 type="button"
                 onClick={() => {
                   setContextMode("github");
-                  if (!github.trim()) {
-                    setGithub("torvalds");
-                    triggerPreviewFetch("torvalds");
-                  }
+                  setValidationError(null);
                 }}
                 disabled={loading}
                 className={cn(
@@ -543,6 +567,7 @@ export function Form() {
               </button>
             </div>
 
+            {/* GitHub Input & Repo Selector when contextMode === "github" */}
             {contextMode === "github" && (
               <div className="space-y-3 p-3.5 rounded-xl border border-border/80 bg-background/60 animate-in fade-in duration-200">
                 <div
@@ -557,12 +582,13 @@ export function Form() {
                   <Input
                     value={github}
                     aria-label="GitHub username or repository URL"
-                    placeholder="github.com/username or repo"
+                    placeholder="e.g. username or github.com/username/repo"
                     onChange={(e) => handleGithubChange(e.target.value)}
                     onBlur={() => triggerPreviewFetch(github)}
                     onKeyDown={(e) => e.key === "Enter" && !loading && onSubmit()}
                     disabled={loading}
                     className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-xs font-mono h-8 p-0"
+                    autoFocus={!github}
                   />
                   {github.trim() && (
                     <button
@@ -587,8 +613,9 @@ export function Form() {
                   </p>
                 )}
 
+                {/* Quick Demos */}
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="font-mono text-[10px] uppercase">Quick Demos:</span>
+                  <span className="font-mono text-[10px] uppercase">Try Quick Demo:</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -611,45 +638,128 @@ export function Form() {
                   </button>
                 </div>
 
-                {profilePreview && profilePreview.repos && profilePreview.repos.length > 0 && (
-                  <div className="pt-2 border-t border-border/40">
-                    <span className="text-[11px] font-medium text-muted-foreground block mb-2">
-                      Select Project to Discuss:
+                {/* Scanned Repositories List + All Profile + Custom Repo */}
+                {profilePreview && (
+                  <div className="pt-2 border-t border-border/40 space-y-2">
+                    <span className="text-[11px] font-medium text-muted-foreground block">
+                      Select Architecture Focus:
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {profilePreview.repos.slice(0, 4).map((r) => {
-                        const isSelected = selectedRepo === r.name;
-                        return (
-                          <button
-                            key={r.name}
-                            type="button"
-                            onClick={() => setSelectedRepo(r.name)}
-                            className={cn(
-                              "flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-                              isSelected
-                                ? "border-primary bg-primary/10 shadow-sm"
-                                : "border-border/60 bg-background hover:border-border"
-                            )}
-                          >
-                            <div className="min-w-0 flex-1 pr-2">
-                              <span className="text-xs font-semibold font-mono text-foreground block truncate">
-                                {r.name}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground block truncate">
-                                {r.language || "Repository"} · {r.stars}★
-                              </span>
-                            </div>
-                            {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
+
+                    {/* General Profile (All Repos) option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRepo("__ALL__");
+                        setIsCustomRepoMode(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                        !isCustomRepoMode && selectedRepo === "__ALL__"
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border/60 bg-background hover:border-border"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FolderGit2 className="size-3.5 text-primary shrink-0" />
+                        <div>
+                          <span className="text-xs font-semibold text-foreground block">
+                            General Profile Portfolio
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">
+                            Discuss architecture across all public repositories ({profilePreview.publicReposCount} total)
+                          </span>
+                        </div>
+                      </div>
+                      {!isCustomRepoMode && selectedRepo === "__ALL__" && (
+                        <Check className="size-3 text-primary stroke-[3] shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Scanned Repositories Grid */}
+                    {profilePreview.repos && profilePreview.repos.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {profilePreview.repos.slice(0, 6).map((r) => {
+                          const isSelected = !isCustomRepoMode && selectedRepo === r.name;
+                          return (
+                            <button
+                              key={r.name}
+                              type="button"
+                              onClick={() => {
+                                setSelectedRepo(r.name);
+                                setIsCustomRepoMode(false);
+                              }}
+                              className={cn(
+                                "flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                                isSelected
+                                  ? "border-primary bg-primary/10 shadow-sm"
+                                  : "border-border/60 bg-background hover:border-border"
+                              )}
+                            >
+                              <div className="min-w-0 flex-1 pr-2">
+                                <span className="text-xs font-semibold font-mono text-foreground block truncate">
+                                  {r.name}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block truncate">
+                                  {r.language || "Repository"} {r.stars > 0 && `· ${r.stars}★`}
+                                </span>
+                              </div>
+                              {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Custom Repository Mode Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomRepoMode(true);
+                        setSelectedRepo(null);
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                        isCustomRepoMode
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border/60 bg-background hover:border-border"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Plus className="size-3.5 text-primary shrink-0" />
+                        <div>
+                          <span className="text-xs font-semibold text-foreground block">
+                            Target Other / Specific Repository...
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">
+                            Specify any other project name from this profile
+                          </span>
+                        </div>
+                      </div>
+                      {isCustomRepoMode && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
+                    </button>
+
+                    {isCustomRepoMode && (
+                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-primary/50 bg-background p-1.5 animate-in fade-in">
+                        <span className="pl-2 text-xs font-mono text-muted-foreground shrink-0">
+                          Repo:
+                        </span>
+                        <Input
+                          value={customRepoInput}
+                          placeholder="e.g. my-project-name or distributed-cache"
+                          onChange={(e) => setCustomRepoInput(e.target.value)}
+                          disabled={loading}
+                          className="h-8 border-0 bg-transparent text-xs font-mono focus-visible:ring-0 p-0"
+                          autoFocus
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
 
+          {/* Primary Action Button */}
           <div className="pt-4 border-t border-border/40 space-y-3">
             <Button
               disabled={loading}
@@ -671,6 +781,7 @@ export function Form() {
               )}
             </Button>
 
+            {/* Stepped Loading Animation */}
             {loading && (
               <div className="pt-2 animate-in fade-in duration-200">
                 <div className="space-y-1.5">
@@ -718,6 +829,7 @@ export function Form() {
           </div>
         </div>
 
+        {/* Minimal Colophon Footer */}
         <footer className="mt-8 text-center text-xs text-muted-foreground/70 pb-4">
           <p>
             AI Technical Interviewer · Built for High-Signal Engineering Evaluations

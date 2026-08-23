@@ -105,11 +105,36 @@ ${
 
 ${
   isFullMock
-    ? `NOTE: For Comprehensive Full Mock Screen track, category semantics map as:
-- technicalAccuracy -> Core Technical Correctness & Domain Mechanics across live scenarios
-- problemSolving -> Architectural Judgment, Scalability & Trade-Off Defense
-- communication -> Career Storytelling ("Tell me about yourself" conciseness), Articulation & Reverse Q&A
-- depth -> Production Realities, Behavioral Leadership & Incident Ownership`
+    ? `### COMPREHENSIVE FULL MOCK SCREEN (5-PHASE DIAGNOSTIC RUBRIC):
+Evaluate candidate signal across the 5 structured interview phases that were observed in the transcript:
+
+1. **Phase 1 — Career Storytelling & Background ("Tell me about yourself")**:
+   - *Evaluated under*: **communication** (Storytelling & Articulation)
+   - *Strong*: Crisp 60-90s executive summary, highlights primary technical stack and major architectural achievements without meandering.
+   - *Weak*: Rambling timeline (>3 mins), reciting resume line-by-line, or lacking clarity on core engineering specialty.
+
+2. **Phase 2 — Flagship Project Deep-Dive**:
+   - *Evaluated under*: **problemSolving** (Architectural Judgment) & **depth**
+   - *Strong*: Clear personal ownership ("I designed/built", not vague "we"), explicit data flow, and trade-off justification for chosen storage/queues/frameworks.
+   - *Weak*: Buzzword hand-waving, unable to explain underlying query costs, network protocols, or caching invalidation strategies.
+
+3. **Phase 3 — Live Technical / System Design Scenario**:
+   - *Evaluated under*: **technicalAccuracy** (Technical Systems) & **problemSolving**
+   - *Strong*: Systematic problem decomposition, defends architecture when stress/chaos/traffic spikes are injected, concrete mechanical trade-offs.
+   - *Weak*: Passive agreement with hints, brittle under pushback, throwing tools at problems without sizing, capacity, or cost awareness.
+
+4. **Phase 4 — Behavioral Leadership & Incident Response**:
+   - *Evaluated under*: **depth** (Production & Leadership) & **communication**
+   - *Strong*: Structured STAR response, genuine personal accountability in post-mortems, constructive resolution of technical disagreements, and measurable impact.
+   - *Weak*: Blaming coworkers, lacking personal action, vague outcomes without measurable engineering metrics.
+
+5. **Phase 5 — Candidate Reverse Q&A**:
+   - *Evaluated under*: **communication** & **summary**
+   - *Evaluation Rule*: Grade the *strategic caliber and seniority of questions asked by the candidate* (e.g. asking about team deployment velocity, on-call health, or technical debt management).
+   - **CRITICAL INVARIANT (Reverse Q&A Non-Attribution)**: In Phase 5, the interviewer answers candidate questions. Do NOT attribute the technical depth or architecture explained by the interviewer to the candidate.
+
+6. **PARTIAL / INCOMPLETE SESSION HANDLING**:
+   - Only evaluate the phases that actually occurred in the transcript. If the session ended early (e.g., candidate stopped after Phase 2 or 3), grade the observed phases fairly without penalizing unreached phases, and explicitly state which phases were observed in the summary.`
     : ""
 }
 

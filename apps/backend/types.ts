@@ -4,6 +4,7 @@ export const ExperienceLevelEnum = z.enum(["JUNIOR", "MID", "SENIOR"]);
 export type ExperienceLevel = z.infer<typeof ExperienceLevelEnum>;
 
 export const InterviewTrackEnum = z.enum([
+  "FULL_MOCK_SCREEN",
   "FULLSTACK_GENERAL",
   "BACKEND",
   "FRONTEND",

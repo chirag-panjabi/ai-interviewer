@@ -74,6 +74,7 @@ interface ResultData {
 }
 
 const TRACK_LABELS: Record<string, string> = {
+  FULL_MOCK_SCREEN: "Full Mock Screen (End-to-End)",
   FULLSTACK_GENERAL: "Full-Stack",
   BACKEND: "Backend Engineering",
   FRONTEND: "Frontend Engineering",
@@ -226,32 +227,33 @@ export function Result() {
   const levelLabel = result.experienceLevel ? (LEVEL_LABELS[result.experienceLevel] || result.experienceLevel) : null;
   const isBehavioral = result.track === "BEHAVIORAL";
   const isDSA = result.track === "DSA";
+  const isFullMock = result.track === "FULL_MOCK_SCREEN";
 
   const categoriesConfig = [
     {
       key: "technicalAccuracy" as const,
-      title: isBehavioral ? "Situation Framing" : isDSA ? "Algorithmic Correctness" : "Technical Accuracy",
+      title: isFullMock ? "Technical Systems" : isBehavioral ? "Situation Framing" : isDSA ? "Algorithmic Correctness" : "Technical Accuracy",
       icon: Code2,
       score: evalData?.categories?.technicalAccuracy?.score ?? 0,
       feedback: evalData?.categories?.technicalAccuracy?.feedback ?? "",
     },
     {
       key: "problemSolving" as const,
-      title: isBehavioral ? "Action Quality" : isDSA ? "Optimization Ability" : "Problem Solving",
+      title: isFullMock ? "Architectural Judgment" : isBehavioral ? "Action Quality" : isDSA ? "Optimization Ability" : "Problem Solving",
       icon: Brain,
       score: evalData?.categories?.problemSolving?.score ?? 0,
       feedback: evalData?.categories?.problemSolving?.feedback ?? "",
     },
     {
       key: "communication" as const,
-      title: isBehavioral ? "Impact Articulation" : isDSA ? "Communication" : "Communication",
+      title: isFullMock ? "Storytelling & Articulation" : isBehavioral ? "Impact Articulation" : isDSA ? "Communication" : "Communication",
       icon: MessageSquare,
       score: evalData?.categories?.communication?.score ?? 0,
       feedback: evalData?.categories?.communication?.feedback ?? "",
     },
     {
       key: "depth" as const,
-      title: isBehavioral ? "Leadership Signals" : isDSA ? "Complexity Analysis" : "Engineering Depth",
+      title: isFullMock ? "Production & Leadership" : isBehavioral ? "Leadership Signals" : isDSA ? "Complexity Analysis" : "Engineering Depth",
       icon: Layers,
       score: evalData?.categories?.depth?.score ?? 0,
       feedback: evalData?.categories?.depth?.feedback ?? "",

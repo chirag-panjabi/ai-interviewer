@@ -38,6 +38,7 @@ import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "@/lib/apiKeyStorag
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
 
 type InterviewTrack =
+  | "FULL_MOCK_SCREEN"
   | "FULLSTACK_GENERAL"
   | "BACKEND"
   | "FRONTEND"
@@ -88,7 +89,15 @@ const EXPERIENCE_LEVELS: Array<{
   },
 ];
 
-const TRACKS: Array<{
+const FULL_MOCK_TRACK = {
+  id: "FULL_MOCK_SCREEN" as const,
+  title: "Comprehensive Full Mock Screen",
+  badge: "360° Simulation",
+  description: "Intro Story · Flagship Project Deep-Dive · Live Tech Scenario · Behavioral · Reverse Q&A",
+  icon: Sparkles,
+};
+
+const DOMAIN_TRACKS: Array<{
   id: InterviewTrack;
   title: string;
   description: string;
@@ -144,10 +153,12 @@ const TRACKS: Array<{
   },
 ];
 
+const ALL_TRACKS = [FULL_MOCK_TRACK, ...DOMAIN_TRACKS];
+
 export function Form() {
   const [github, setGithub] = useState("");
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("MID");
-  const [track, setTrack] = useState<InterviewTrack>("FULLSTACK_GENERAL");
+  const [track, setTrack] = useState<InterviewTrack>("FULL_MOCK_SCREEN");
   const [contextMode, setContextMode] = useState<"general" | "github">("general");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -169,7 +180,7 @@ export function Form() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const selectedTrackObj = TRACKS.find((t) => t.id === track);
+  const selectedTrackObj = ALL_TRACKS.find((t) => t.id === track);
   const selectedLevelObj = EXPERIENCE_LEVELS.find((l) => l.id === experienceLevel);
 
   const loadingSteps = [
@@ -189,7 +200,7 @@ export function Form() {
       const urlTrack = searchParams.get("track");
       const urlLevel = searchParams.get("level") || searchParams.get("exp");
 
-      if (urlTrack && TRACKS.some((t) => t.id === urlTrack)) {
+      if (urlTrack && ALL_TRACKS.some((t) => t.id === urlTrack)) {
         setTrack(urlTrack as InterviewTrack);
       }
       if (urlLevel && EXPERIENCE_LEVELS.some((l) => l.id === urlLevel.toUpperCase())) {
@@ -432,41 +443,86 @@ export function Form() {
           {/* 1. Track Selector */}
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-              1. Choose Domain Track
+              1. Choose Interview Mode & Track
             </label>
-            <div role="radiogroup" aria-label="Select Focus Track" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {TRACKS.map((t) => {
-                const isSelected = track === t.id;
-                const Icon = t.icon;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    disabled={loading}
-                    onClick={() => setTrack(t.id)}
-                    className={cn(
-                      "flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer relative",
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm"
-                        : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
-                      loading && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full mb-1.5">
-                      <Icon className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                      {isSelected && <Check className="size-3 text-primary stroke-[3]" />}
-                    </div>
-                    <span className="text-xs font-semibold text-foreground leading-tight">
-                      {t.title}
+
+            {/* Featured Comprehensive Full Mock Banner */}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={track === "FULL_MOCK_SCREEN"}
+              disabled={loading}
+              onClick={() => setTrack("FULL_MOCK_SCREEN")}
+              className={cn(
+                "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer mb-3 relative",
+                track === "FULL_MOCK_SCREEN"
+                  ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                  : "border-border/70 bg-background/60 hover:border-border hover:bg-background/90",
+                loading && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="size-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="size-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-foreground">
+                      Comprehensive Full Mock Screen
                     </span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                      {t.description}
+                    <span className="rounded bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider">
+                      Full 360° Loop
                     </span>
-                  </button>
-                );
-              })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Intro Story · Flagship Project Deep-Dive · Live Tech Scenario · Behavioral · Reverse Q&A
+                  </p>
+                </div>
+              </div>
+              {track === "FULL_MOCK_SCREEN" && (
+                <Check className="size-4 text-primary stroke-[3] shrink-0 ml-2" />
+              )}
+            </button>
+
+            {/* Specialized Domain Track Pills (2x4 Grid) */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                Or Target a Specific Technical Track:
+              </span>
+              <div role="radiogroup" aria-label="Select Focus Track" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {DOMAIN_TRACKS.map((t) => {
+                  const isSelected = track === t.id;
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      disabled={loading}
+                      onClick={() => setTrack(t.id)}
+                      className={cn(
+                        "flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer relative",
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
+                        loading && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1.5">
+                        <Icon className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
+                        {isSelected && <Check className="size-3 text-primary stroke-[3]" />}
+                      </div>
+                      <span className="text-xs font-semibold text-foreground leading-tight">
+                        {t.title}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                        {t.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

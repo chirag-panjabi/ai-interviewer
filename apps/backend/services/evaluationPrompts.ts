@@ -1,6 +1,7 @@
 export type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
 
 export type InterviewTrack =
+  | "FULL_MOCK_SCREEN"
   | "FULLSTACK_GENERAL"
   | "BACKEND"
   | "FRONTEND"
@@ -24,6 +25,7 @@ export function getEvaluationPrompt(params: EvaluationPromptParams): string {
   const trackDisplay = formatTrackName(track);
   const isBehavioral = track === "BEHAVIORAL";
   const isDSA = track === "DSA";
+  const isFullMock = track === "FULL_MOCK_SCREEN";
 
   return `You are a Principal Staff Software Engineer and Hiring Committee Chair at a top Tier-1 technology company (such as Stripe, Google, or Meta).
 You are conducting an objective, evidence-based, unapologetically rigorous technical interview evaluation.
@@ -51,11 +53,14 @@ ${transcriptFormatted}
    - Differentiate between reciting high-level buzzwords ("we used Redis and Kafka") and explaining under-the-hood execution mechanics (e.g. memory structures, B-Tree indexes, lock contention, cache stampede prevention, consumer offsets, event loops, network latency).
    - Evaluate whether the candidate understands *why* trade-offs were made, *how* systems fail under pressure, and *where* bottlenecks emerge.
 
-3. **PRINCIPLE OF PRECISION & INACCURACY PENALTIES**:
+3. **PRINCIPLE OF TECHNICAL COMPETENCY GATING**:
+   - **Communication Cannot Compensate for Technical Failure**: Even if the candidate delivered a charismatic, polished 60-second introductory narrative ("Tell me about yourself"), if they demonstrated fundamental technical gaps or failed core system mechanics (\`technicalAccuracy < 4.5\`), the overall recommendation MUST NOT exceed **Lean No Hire** or **No Hire**.
+
+4. **PRINCIPLE OF PRECISION & INACCURACY PENALTIES**:
    - Actively penalize nonsensical terms (e.g. "cloning for outliers", confusing frontend JS with backend Python ML serving, "not knowing recursion"), trailing off sentences, or audio test placeholders ("ABCD123456789").
    - Severe technical errors or fundamental gaps must immediately dock Technical Accuracy and Depth scores into the **0.0 - 2.5** range.
 
-4. **PRINCIPLE OF ZERO PARTICIPATION PRAISE (AUTHENTIC SIGNAL ONLY)**:
+5. **PRINCIPLE OF ZERO PARTICIPATION PRAISE (AUTHENTIC SIGNAL ONLY)**:
    - "strengths" must contain between **0 and 3 items**.
    - NEVER invent participation praise for baseline elementary definitions (e.g. reciting standard Big-O or basic row deletion is NOT a senior strength).
    - If the candidate failed to meet the declared bar or exhibited severe gaps, return an empty array \`[]\` or explicitly state \`["No substantial engineering strengths demonstrated at the declared ${experienceLevel} bar."]\`.
@@ -95,8 +100,18 @@ ${
 ### 4 EVALUATION CATEGORIES:
 1. **technicalAccuracy**: Correctness of concepts, syntax, APIs, database mechanics, protocols, and architectural models.
 2. **problemSolving**: Edge case handling, trade-off analysis, systematic reasoning under constraints, defense under pushback, and failure mode mitigation.
-3. **communication**: Technical precision, structured articulation, conciseness, coachability (for juniors), and clarity without trailing off.
+3. **communication**: Technical precision, structured articulation, conciseness (especially in introductory background overview), coachability (for juniors), and clarity without trailing off.
 4. **depth**: Underlying systems mastery (memory, latency, indexing, concurrency) vs superficial high-level terminology.
+
+${
+  isFullMock
+    ? `NOTE: For Comprehensive Full Mock Screen track, category semantics map as:
+- technicalAccuracy -> Core Technical Correctness & Domain Mechanics across live scenarios
+- problemSolving -> Architectural Judgment, Scalability & Trade-Off Defense
+- communication -> Career Storytelling ("Tell me about yourself" conciseness), Articulation & Reverse Q&A
+- depth -> Production Realities, Behavioral Leadership & Incident Ownership`
+    : ""
+}
 
 ${
   isBehavioral
@@ -162,6 +177,8 @@ Respond with ONLY a valid, parseable JSON object matching this schema:
 
 function formatTrackName(track: string): string {
   switch (track) {
+    case "FULL_MOCK_SCREEN":
+      return "Comprehensive Full Mock Interview";
     case "FULLSTACK_GENERAL":
       return "Full-Stack Web Development";
     case "BACKEND":

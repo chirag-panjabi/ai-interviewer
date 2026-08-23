@@ -299,12 +299,13 @@ cd apps/frontend && bunx tsc --noEmit && bun run build
 ## 📄 Resume Project Description
 
 ```text
-AI Technical Interview Platform | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API
-• Engineered a production-grade multimodal voice screening platform utilizing Google Gemini Live API (gemini-3.1-flash-live-preview) for bidirectional, zero-cost, sub-350ms P95 latency audio conversations.
-• Architected a low-latency Web Audio API pipeline with 16kHz Int16 PCM microphone streaming, gapless 24kHz audio buffer scheduling, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
-• Built an interactive GitHub repository ingestion engine featuring URL auto-detection, a 10-minute TTL in-memory LRU cache, and prompt-injection-isolated README architecture extraction across 8 specialized domains.
-• Implemented a strict 2-sentence conversational cadence formula and an automated First-Principles evaluator enforcing anti-spoonfeeding invariants, mechanical depth scoring, and structured rubric synthesis.
-• Designed a 2-tier rate limiting & BYOK security architecture with configurable daily IP demo quotas and zero-persistence client-side API key encryption.
+AI Technical Interviewer (Voice AI) | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API, WebSockets
+• Engineered a production-grade multimodal voice screening platform utilizing Gemini Live API (gemini-3.1-flash-live-preview) for bidirectional, zero-cost, sub-300ms latency audio conversations with zero external STT/TTS overhead.
+• Architected a high-throughput Web Audio API pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, 7-band parametric audio analysis, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
+• Built a stateful conversational engine enforcing a 2-sentence spoken cadence, adaptive signal-saturation depth probing, ASR phonetic normalization ("post grass" -> PostgreSQL), anti-assistant anchors, and dead-end pivots.
+• Developed an interactive GitHub context ingestion engine with auto-URL detection, 10-minute TTL LRU caching, and prompt-injection-isolated README architecture extraction across 8 specialized engineering tracks.
+• Designed an asynchronous First-Principles evaluation engine with technical competency gating (technicalAccuracy < 4.5 hard cap), anti-spoonfeeding verification, Reverse Q&A non-attribution, and structured JSON rubric generation.
+• Implemented a 2-tier security and access architecture supporting hosted demo IP sliding-window quotas and zero-persistence Bring-Your-Own-Key (BYOK) authentication with live pre-flight key verification.
 ```
 
 ---

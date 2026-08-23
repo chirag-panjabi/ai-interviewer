@@ -60,6 +60,7 @@ enum ExperienceLevel {
 }
 
 enum InterviewTrack {
+  FULL_MOCK_SCREEN
   FULLSTACK_GENERAL
   BACKEND
   FRONTEND

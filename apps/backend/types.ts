@@ -17,8 +17,8 @@ export const InterviewTrackEnum = z.enum([
 export type InterviewTrack = z.infer<typeof InterviewTrackEnum>;
 
 export const PreInterviewBody = z.object({
-  github: z.string().default("candidate"),
+  github: z.string().optional().nullable().transform((val) => (val && val.trim() ? val.trim() : "candidate")),
   experienceLevel: ExperienceLevelEnum.default("MID"),
-  track: z.string().default("FULLSTACK_GENERAL"),
-  selectedRepo: z.string().nullable().optional(),
+  track: InterviewTrackEnum.default("FULL_MOCK_SCREEN"),
+  selectedRepo: z.string().optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
 });

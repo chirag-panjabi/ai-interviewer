@@ -53,8 +53,12 @@ const previewCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export function parseGithubInput(input: string): { username: string; repoName?: string } {
-  let cleaned = input.trim();
+  let cleaned = (input || "").trim();
   
+  if (!cleaned) {
+    return { username: "candidate" };
+  }
+
   // Remove leading @ symbol if user types "@username" or "@username/repo"
   if (cleaned.startsWith("@")) {
     cleaned = cleaned.slice(1);
@@ -79,11 +83,7 @@ export function parseGithubInput(input: string): { username: string; repoName?: 
 
   // Split path segments
   const parts = cleaned.split("/").filter(Boolean);
-  const username = parts[0];
-
-  if (!username) {
-    throw new Error("Invalid GitHub profile URL or username");
-  }
+  const username = parts[0] || "candidate";
 
   // If a second segment exists and isn't a subpath like 'tab', 'repositories', etc.
   let repoName: string | undefined = undefined;
@@ -242,6 +242,18 @@ export async function getGithubReposPreview(input: string): Promise<GithubProfil
 export async function scrapeGithub(input: string, explicitSelectedRepo?: string | null): Promise<GithubPortfolio> {
   const { username, repoName: parsedRepoName } = parseGithubInput(input);
   const targetRepoName = explicitSelectedRepo || parsedRepoName;
+
+  if (!username || username.toLowerCase() === "candidate") {
+    return {
+      username: "candidate",
+      name: "Candidate",
+      bio: null,
+      publicReposCount: 0,
+      selectedRepo: targetRepoName || null,
+      repos: [],
+    };
+  }
+
   const headers = getGithubHeaders();
 
   try {

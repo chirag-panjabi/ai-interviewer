@@ -114,8 +114,10 @@ interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res
 
     res.json({ id: interview.id });
   } catch (err: any) {
-    console.error("Error creating pre-interview:", err);
-    res.status(500).json({ message: "Failed to initialize interview" });
+    console.error("[PreInterview] Error initializing interview:", err?.message || err);
+    res.status(500).json({
+      message: err?.message ? `Failed to initialize interview: ${err.message}` : "Failed to initialize interview",
+    });
   }
 });
 

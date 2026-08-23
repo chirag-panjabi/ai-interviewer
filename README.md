@@ -284,6 +284,24 @@ This repository includes a [`render.yaml`](render.yaml) blueprint configured for
 
 ---
 
+## 📚 Technical Documentation Suite
+
+For exhaustive implementation details, state machines, and operational runbooks, refer to the documentation:
+
+| Document | Topic & Focus Area |
+| :--- | :--- |
+| [**01. System Architecture**](docs/01_SYSTEM_ARCHITECTURE.md) | High-level topology, monorepo layout, end-to-end data flows, and design principles. |
+| [**02. Frontend Deep Dive**](docs/02_FRONTEND_DEEP_DIVE.md) | React components (`Form`, `Interview`, `Result`), Web Audio API pipeline, PCM streaming & playback. |
+| [**03. Backend Deep Dive**](docs/03_BACKEND_DEEP_DIVE.md) | Express HTTP routes, WebSocket gateway, Gemini Live integration, and GitHub ingestion engine. |
+| [**04. AI Prompting & Evaluation**](docs/04_AI_PROMPTING_AND_EVAL.md) | Staff Engineer Alex persona, 14 conversational invariants, 3-layer depth drill, and Tier-1 rubrics. |
+| [**05. Database & State Flow**](docs/05_DATABASE_AND_STATE_FLOW.md) | PostgreSQL schema, Prisma models, interview lifecycle state machine, and asynchronous turn persistence. |
+| [**06. Deployment & BYOK Architecture**](docs/06_DEPLOYMENT_AND_BYOK.md) | Environment configuration, Vercel/Render hosting topologies, and Bring-Your-Own-Key security. |
+| [**07. Troubleshooting & Runbook**](docs/07_TROUBLESHOOTING_RUNBOOK.md) | Diagnostic runbooks for common failures, local test scripts, and operational recovery commands. |
+| [**08. API & WebSocket Reference**](docs/08_API_REFERENCE.md) | Complete reference for REST endpoints, schemas, real-time WebSocket protocol frames, and SDK integration examples. |
+| [**09. Benchmarks & Evaluation Metrics**](docs/09_BENCHMARKS_AND_EVALUATIONS.md) | Latency budgets (P50/P95), Web Audio benchmarks, barge-in performance, and hiring evaluation calibration. |
+
+---
+
 ## 🧪 Running Automated Tests & Typechecks
 
 ```bash

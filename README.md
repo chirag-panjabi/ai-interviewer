@@ -104,16 +104,16 @@ flowchart TD
 
 ## 🧭 Supported Technical Tracks & Seniority Matrix
 
-| Technical Focus Track | Primary Architectural Focus |
+| Technical Focus Track | Primary Architectural Focus & Evaluation Drill |
 | :--- | :--- |
-| **Full-Stack / General** | End-to-end API lifecycle, state management, caching, DB schema design |
-| **System Design & Backend** | Distributed systems, microservices, concurrency, message brokers (Kafka/RabbitMQ) |
-| **Frontend & Web Architecture** | Rendering lifecycles, Core Web Vitals, SSR/SSG, state machines, DOM performance |
-| **Data Engineering & Pipelines** | Stream processing, ETL/ELT pipelines, columnar storage, partitioning, Spark/Flink |
-| **DevOps, Cloud & SRE** | Kubernetes, CI/CD pipelines, IaC, observability (OTel/Prometheus), failover |
-| **Cybersecurity & AppSec** | Threat modeling, auth protocols (OAuth/OIDC), cryptography, zero-trust |
-| **AI / ML & LLM Engineering** | Model serving, embeddings, vector indexing, inference optimization, RAG pipelines |
-| **Mobile Architecture** | Offline-first sync, battery/memory profiling, native bridges, background threads |
+| **Full-Stack General** | End-to-end API lifecycle, state management, cache hierarchies, database schema design, and full-stack performance |
+| **Backend Engineering** | Concurrency, REST/gRPC API contracts, DB indexing, storage engines (LSM/B-Tree), message queues, and distributed locks |
+| **Frontend Engineering** | Component architecture, Core Web Vitals (LCP/INP/CLS), SSR/hydration, state machines, and DOM rendering mechanics |
+| **System Design** | High-scale topologies, capacity estimation, consistent hashing, database sharding, fault tolerance, and disaster recovery |
+| **DSA & Algorithms** | Problem clarification, constraint analysis, optimal data structures (Heaps, Trees, Hash Tables), and Big-O bounds |
+| **Behavioral & Culture** | STAR method storytelling, technical ownership, handling ambiguity, resolving engineering disagreements, and post-mortems |
+| **DevOps & Cloud** | CI/CD automation, Docker/Kubernetes orchestration, Terraform IaC, service meshes, observability (OTel), and cloud cost governance |
+| **ML & AI Engineering** | End-to-end ML pipelines, feature stores, embedding search (HNSW), model serving latency, and LLM agent orchestration |
 
 ### Seniority Calibration
 - **Junior / Entry (0–2 yrs)**: Focus on syntax correctness, core data structures, API contracts, and basic error handling.

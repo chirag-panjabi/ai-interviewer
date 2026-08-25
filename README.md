@@ -287,26 +287,6 @@ This repository includes a [`render.yaml`](render.yaml) blueprint configured for
 
 ---
 
-## 📚 Architecture & Engineering Modules
-
-The platform is structured into modular, decoupled engineering systems:
-
-| Architecture Module | Focus Area & Implementation Mechanics |
-| :--- | :--- |
-| **01. System Architecture** | High-level topology, monorepo layout, full-duplex WebSocket data flows, and design principles. |
-| **02. Frontend Deep Dive** | React 19 view tree, Web Audio DSP pipeline, linear 48k $\rightarrow$ 16k downsampler, and 60 FPS VoiceOrb visualizer. |
-| **03. Backend Deep Dive** | Express 5 REST API, bidirectional WebSocket gateway, Gemini Live proxy, and sandboxed GitHub ingestion. |
-| **04. AI Prompting & Evaluation** | Staff Engineer Alex persona, 14 conversational invariants, 3-layer depth drill, and Anti-Sycophancy Gate. |
-| **05. Database & State Flow** | PostgreSQL schema, Prisma models, interview lifecycle state machine, and asynchronous `dbWriteQueue` microtasks. |
-| **06. Deployment & BYOK Architecture** | Zero-persistence Bring-Your-Own-Key security, Docker containerization, and Render multi-service blueprints. |
-| **07. Troubleshooting & Runbook** | Diagnostic runbooks for common audio/network failures, automated test scripts, and operational health probes. |
-| **08. API & WebSocket Reference** | Complete schema reference for REST endpoints, real-time WebSocket protocol frames, and SDK integration. |
-| **09. Benchmarks & Evaluation Metrics** | Latency budgets (P50/P95 $<350\text{ms}$), Web Audio benchmarks, barge-in performance, and grading calibration. |
-| **10. Architecture & Data Flow Diagrams** | Comprehensive visual reference with 40 architectural diagrams, data-flow traces, and DSP signal math. |
-| **11. Interview Compendium** | 255 master interview questions across 8 progressive parts with Live Coding algorithms and STAR behavioral defense. |
-
----
-
 ## 🧪 Running Automated Tests & Typechecks
 
 ```bash

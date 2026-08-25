@@ -18,45 +18,58 @@ Built with a high-performance modern full-stack architecture (**React 19**, **Bu
 
 ```mermaid
 flowchart TD
-    subgraph Client["Frontend Client (React 19 + Tailwind CSS + Web Audio API)"]
-        Workbench["Setup Workbench & Repo Selector<br/>(URL Detection, Starred Cards, Track Picker)"]
-        AudioConsole["Studio Audio Readiness Console<br/>(Live Diagnostics, 7-Band Parametric EQ)"]
-        Mic["Microphone Stream<br/>(16kHz Mono Int16 PCM)"]
-        Player["Live Audio Player<br/>(24kHz PCM Scheduling + Barge-in Interruption)"]
-        Scorecard["Evaluation Report Dossier<br/>(Rubric Rail, Quotes, Transcript Search)"]
-        BYOKModal["Precision BYOK Security Dialog<br/>(Live Pre-flight Key Validation)"]
+    subgraph Client ["🖥️ Frontend Client (React 19 + Web Audio DSP)"]
+        UI["Setup & Track Studio<br/>(8 Tracks + Seniority Matrix + BYOK Modal)"]
+        VoiceStage["Voice Stage & VoiceOrbs<br/>(60 FPS RMS Energy Visualizer)"]
+        
+        subgraph ClientAudioEngine ["Native C++ Web Audio DSP Pipeline"]
+            MicNode["Mic Input (48k -> 16k Linear Resampling)"]
+            PlayerNode["Live Audio Player (24kHz Jitter-Free Scheduler)"]
+            DSPMixer["MediaStreamAudioDestinationNode<br/>(Dual-Track Zero-Latency Mixer)"]
+            EBMLPatcher["EBML Header Duration Patcher<br/>(crbug/642012 In-Place Fix)"]
+        end
+
+        IDB[("IndexedDB Local Store<br/>(5-Session LRU / <50MB Cap)")]
+        ScorecardUI["Executive Scorecard Dossier<br/>(4-Pillar Rubric + Interactive Transcript)"]
     end
 
-    subgraph Server["Backend Server (Bun + Express 5 + WebSocket Relay)"]
-        RESTRouter["REST API Router (/api/v1/*)<br/>(GitHub Scraper, Key Verifier, Session Init)"]
-        WSServer["WebSocket Gateway (/api/v1/live/:id)<br/>(Heartbeat, Barge-in Relay, Stream Sync)"]
-        PromptEngine["Prompt Engine (promptBuilder.ts)<br/>(2-Sentence Cadence & 3-Layer Depth Drill)"]
-        EvalEngine["Evaluation Service (evaluation.ts)<br/>(Dynamic First-Principles Rubric Analysis)"]
-        RateLimiter["Adaptive Rate Limiter<br/>(Configurable Demo Quotas & IP Protection)"]
-        DB[(PostgreSQL + Prisma ORM)]
+    subgraph Gateway ["⚡ Backend Server (Bun + Express 5 + WebSockets)"]
+        RESTRouter["Express 5 REST API (:3001)<br/>(GitHub Scraper + Rate Limiter)"]
+        WSHub["WebSocket Gateway Hub (:3001/api/v1/live/:id)<br/>(Bidi Proxy + Turn Cadence Controller)"]
+        DBQueue["Async Serial Write Queue<br/>(Zero-Lag Event Loop Microtasks)"]
     end
 
-    subgraph GoogleAI["Google Gemini Cloud"]
-        LiveAPI["Gemini Multimodal Live API<br/>(gemini-3.1-flash-live-preview)<br/>Bi-directional Native Audio-to-Audio"]
-        EvalModel["Gemini Flash Latest<br/>Structured JSON Rubric Synthesis"]
+    subgraph DataTier ["🗄️ Persistence Tier"]
+        PostgresDB[("Neon Serverless PostgreSQL<br/>(Prisma ORM + pg.Pool)")]
     end
 
-    Workbench -->|POST /api/v1/github-preview| RESTRouter
-    Workbench -->|POST /api/v1/pre-interview| RESTRouter
-    BYOKModal -->|POST /api/v1/verify-key| RESTRouter
-    RESTRouter --> DB
+    subgraph CloudAI ["☁️ Google Gemini Cloud"]
+        GeminiLive["Gemini 3.1 Flash Live API (WSS)<br/>Native Bidirectional Audio-to-Audio"]
+        GeminiFlash["Gemini Flash Latest (REST)<br/>Structured JSON Rubric Synthesis"]
+    end
 
-    AudioConsole -->|Connect WS + BYOK Header| WSServer
-    Mic -->|Base64 16kHz PCM Chunks| WSServer
-    WSServer -->|Bidi WebSocket Handshake| LiveAPI
-    LiveAPI -->|24kHz Audio Buffers + outputTranscription| WSServer
-    WSServer -->|Audio Chunks + Synchronized Captions| Player
-    Player --> AudioConsole
+    %% Edge Connections - Realtime Stream
+    MicNode -->|"16kHz Mono PCM (Base64)"| WSHub
+    WSHub <-->|"Bidi Live PCM Stream"| GeminiLive
+    GeminiLive -->|"24kHz Audio Buffers"| WSHub
+    WSHub -->|"24kHz PCM Chunks"| PlayerNode
+    PlayerNode --> VoiceStage
 
-    LiveAPI -->|Streaming Turns & Transcripts| DB
-    WSServer -->|Trigger Post-Call Evaluation| EvalModel
-    EvalModel -->|Structured JSON Scorecard| DB
-    Scorecard -->|GET /api/v1/result/:id| RESTRouter
+    %% Edge Connections - Local DSP & Recording
+    MicNode --> DSPMixer
+    PlayerNode --> DSPMixer
+    DSPMixer -->|"WebM / M4A 2s Timeslice"| EBMLPatcher
+    EBMLPatcher -->|"Patched Seekable Audio"| IDB
+    IDB -.->|"Local Zero-Cost Playback"| ScorecardUI
+
+    %% Edge Connections - Setup & Evaluation
+    UI -->|"POST /pre-interview"| RESTRouter
+    RESTRouter --> DBQueue
+    WSHub --> DBQueue
+    DBQueue -->|"Non-Blocking Batch Inserts"| PostgresDB
+    ScorecardUI -->|"GET /result/:id"| RESTRouter
+    RESTRouter -->|"Grade Transcript"| GeminiFlash
+    GeminiFlash -->|"Structured Dossier JSON"| PostgresDB
 ```
 
 ---

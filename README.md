@@ -287,23 +287,23 @@ This repository includes a [`render.yaml`](render.yaml) blueprint configured for
 
 ---
 
-## 📚 Technical Documentation Suite
+## 📚 Architecture & Engineering Modules
 
-For exhaustive implementation details, state machines, and operational runbooks, refer to the documentation:
+The platform is structured into modular, decoupled engineering systems:
 
-| Document | Topic & Focus Area |
+| Architecture Module | Focus Area & Implementation Mechanics |
 | :--- | :--- |
-| [**01. System Architecture**](docs/01_SYSTEM_ARCHITECTURE.md) | High-level topology, monorepo layout, end-to-end data flows, and design principles. |
-| [**02. Frontend Deep Dive**](docs/02_FRONTEND_DEEP_DIVE.md) | React components (`Form`, `Interview`, `Result`), Web Audio API pipeline, PCM streaming & playback. |
-| [**03. Backend Deep Dive**](docs/03_BACKEND_DEEP_DIVE.md) | Express HTTP routes, WebSocket gateway, Gemini Live integration, and GitHub ingestion engine. |
-| [**04. AI Prompting & Evaluation**](docs/04_AI_PROMPTING_AND_EVAL.md) | Staff Engineer Alex persona, 14 conversational invariants, 3-layer depth drill, and Tier-1 rubrics. |
-| [**05. Database & State Flow**](docs/05_DATABASE_AND_STATE_FLOW.md) | PostgreSQL schema, Prisma models, interview lifecycle state machine, and asynchronous turn persistence. |
-| [**06. Deployment & BYOK Architecture**](docs/06_DEPLOYMENT_AND_BYOK.md) | Environment configuration, Vercel/Render hosting topologies, and Bring-Your-Own-Key security. |
-| [**07. Troubleshooting & Runbook**](docs/07_TROUBLESHOOTING_RUNBOOK.md) | Diagnostic runbooks for common failures, local test scripts, and operational recovery commands. |
-| [**08. API & WebSocket Reference**](docs/08_API_REFERENCE.md) | Complete reference for REST endpoints, schemas, real-time WebSocket protocol frames, and SDK integration examples. |
-| [**09. Benchmarks & Evaluation Metrics**](docs/09_BENCHMARKS_AND_EVALUATIONS.md) | Latency budgets (P50/P95), Web Audio benchmarks, barge-in performance, and hiring evaluation calibration. |
-| [**10. Architecture & Data Flow Diagrams**](docs/10_ARCHITECTURE_AND_DATA_FLOW_DIAGRAMS.md) | Master reference with 40 architectural diagrams, step-by-step traces, DSP math, and interview defense cheat sheet. |
-| [**11. Interview Questions & Staff Defense**](docs/11_INTERVIEW_QUESTIONS_AND_STAFF_DEFENSE_COMPENDIUM.md) | Complete question bank (Fresher to Staff) covering React, Web Audio DSP, WebSockets, Prisma, AI Rubrics, and 100k-concurrency System Design. |
+| **01. System Architecture** | High-level topology, monorepo layout, full-duplex WebSocket data flows, and design principles. |
+| **02. Frontend Deep Dive** | React 19 view tree, Web Audio DSP pipeline, linear 48k $\rightarrow$ 16k downsampler, and 60 FPS VoiceOrb visualizer. |
+| **03. Backend Deep Dive** | Express 5 REST API, bidirectional WebSocket gateway, Gemini Live proxy, and sandboxed GitHub ingestion. |
+| **04. AI Prompting & Evaluation** | Staff Engineer Alex persona, 14 conversational invariants, 3-layer depth drill, and Anti-Sycophancy Gate. |
+| **05. Database & State Flow** | PostgreSQL schema, Prisma models, interview lifecycle state machine, and asynchronous `dbWriteQueue` microtasks. |
+| **06. Deployment & BYOK Architecture** | Zero-persistence Bring-Your-Own-Key security, Docker containerization, and Render multi-service blueprints. |
+| **07. Troubleshooting & Runbook** | Diagnostic runbooks for common audio/network failures, automated test scripts, and operational health probes. |
+| **08. API & WebSocket Reference** | Complete schema reference for REST endpoints, real-time WebSocket protocol frames, and SDK integration. |
+| **09. Benchmarks & Evaluation Metrics** | Latency budgets (P50/P95 $<350\text{ms}$), Web Audio benchmarks, barge-in performance, and grading calibration. |
+| **10. Architecture & Data Flow Diagrams** | Comprehensive visual reference with 40 architectural diagrams, data-flow traces, and DSP signal math. |
+| **11. Interview Compendium** | 255 master interview questions across 8 progressive parts with Live Coding algorithms and STAR behavioral defense. |
 
 ---
 

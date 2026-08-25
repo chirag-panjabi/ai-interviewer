@@ -107,7 +107,9 @@ export class LiveAudioPlayer {
     }
 
     try {
-      const binary = window.atob(base64Pcm);
+      const binary = typeof globalThis.atob !== "undefined"
+        ? globalThis.atob(base64Pcm)
+        : Buffer.from(base64Pcm, "base64").toString("binary");
       const len = binary.length;
       if (len < 2) return;
 
@@ -224,7 +226,9 @@ export function float32ToBase64PCM(input: Float32Array): string {
     const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
     binary += String.fromCharCode.apply(null, chunk as any);
   }
-  return window.btoa(binary);
+  return typeof globalThis.btoa !== "undefined"
+    ? globalThis.btoa(binary)
+    : Buffer.from(binary, "binary").toString("base64");
 }
 
 // Downsample Float32Array to 16kHz

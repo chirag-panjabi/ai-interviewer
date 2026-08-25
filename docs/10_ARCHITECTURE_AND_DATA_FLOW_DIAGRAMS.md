@@ -1,6 +1,6 @@
 # 10 — Complete System Architecture, Data Flow Diagrams & Interview Master Reference
 
-This document serves as the **definitive architectural blueprint, data flow reference, and interview study guide** for the AI Technical Interviewer platform. It covers high-level system topology, low-level DSP audio engineering, button-click lifecycle flows, concurrency patterns, AI evaluation pipelines, and database mechanics.
+This document serves as the **definitive architectural blueprint, data flow reference, and Staff-level interview study guide** for the AI Technical Interviewer platform. It covers high-level system topology, low-level DSP audio engineering, button-click lifecycle flows, concurrency patterns, AI evaluation pipelines, database mechanics, and hard interview questions with answers.
 
 ---
 
@@ -98,15 +98,24 @@ graph TB
     HTTPGateway -->|"Repo Scrape & README Sandbox"| GitHubAPI
 ```
 
-### Explanation of Components:
-- **Client Tier**: A client-side Single Page Application handling UI rendering, native C++ Web Audio DSP streaming, barge-in interruptions, and zero-cost local audio caching in IndexedDB.
-- **Backend Gateway**: A unified Bun + Express 5 application serving REST endpoints and managing stateful WebSocket connections that proxy real-time PCM audio to Google's Gemini Live API.
-- **Data Tier**: PostgreSQL connected via Prisma ORM with `@prisma/adapter-pg` and connection pooling (`pg.Pool`), enforcing relational integrity between interviews and speech turns.
-- **External AI Clouds**: Real-time voice generation is handled by Google's `gemini-3.1-flash-live-preview` (multimodal audio-in/audio-out), while post-interview evaluation is executed by `gemini-flash-latest` with structured JSON schema output.
+### Detailed Step-by-Step Architecture Breakdown:
+1. **Client Tier**: A client-side Single Page Application handling UI rendering, native C++ Web Audio DSP streaming, barge-in interruptions, and zero-cost local audio caching in IndexedDB.
+2. **Backend Gateway**: A unified Bun + Express 5 application serving REST endpoints and managing stateful WebSocket connections that proxy real-time PCM audio to Google's Gemini Live API.
+3. **Data Tier**: PostgreSQL connected via Prisma ORM with `@prisma/adapter-pg` and connection pooling (`pg.Pool`), enforcing relational integrity between interviews and speech turns.
+4. **External AI Clouds**: Real-time voice generation is handled by Google's `gemini-3.1-flash-live-preview` (multimodal audio-in/audio-out), while post-interview evaluation is executed by `gemini-flash-latest` with structured JSON schema output.
 
-### 💡 Interview Questions & Answers:
+### ⚖️ Architectural Trade-off Matrix:
+| Architectural Decision | Chosen Approach | Alternative Evaluated | Why Chosen Over Alternative |
+| :--- | :--- | :--- | :--- |
+| **Voice Processing** | Direct Multimodal Live API (Audio-to-Audio) | 3-Hop Pipeline (STT $\rightarrow$ LLM $\rightarrow$ TTS) | Sub-350ms turnaround vs 1200-2500ms multi-hop serialization latency. |
+| **Audio Recording Storage** | Client-Side IndexedDB + Local Export | Cloud Object Storage (S3 / R2) | Zero cloud storage & egress cost, $0\text{ backend footprint}$, strict candidate privacy. |
+| **Runtime Engine** | Bun + Express 5 + WebSockets | Node.js + ts-node | Instant startup (<50ms), native TypeScript execution, high-performance WebSocket throughput. |
+
+### 💡 Staff Interview Questions & Answers:
 - **Q: Why use a backend WebSocket proxy instead of connecting the browser directly to Gemini Live?**
   - **A**: *(1) Security & Secret Isolation*: The server protects our primary Google AI credentials and rate limits abusive traffic. *(2) Session & Transcript Persistence*: The backend intercepts speech turns and writes them to PostgreSQL without trusting client inputs. *(3) BYOK Dynamic Routing*: The backend inspects incoming headers to seamlessly switch between hosted pool credentials and candidate-provided keys.
+- **Q: What is the primary bottleneck in this architecture and how is it mitigated?**
+  - **A**: Database write I/O during high-frequency speech turns. Mitigated via `dbWriteQueue`—an asynchronous serial microtask queue that ensures WebSocket event loop turns never wait on PostgreSQL TCP roundtrips.
 
 ---
 
@@ -151,11 +160,10 @@ sequenceDiagram
     B-->>C: 200 OK { interview, scorecard }
 ```
 
-### Explanation of Protocol Exchange:
-1. **HTTPS REST**: Initial metadata setup and final evaluation report retrieval.
-2. **WSS Client-to-Backend**: Full-duplex WebSocket sending client PCM chunks (16kHz mono Int16, 2048-sample frames) and receiving assistant audio (24kHz mono Int16).
-3. **WSS Backend-to-Google**: Google's proprietary Bidi streaming protocol transmitting raw byte chunks wrapped in `realtimeInput` JSON messages.
-4. **PostgreSQL Wire Protocol**: Non-blocking asynchronous query pipeline through `pg.Pool`.
+### Granular Protocol Details:
+- **Client $\rightarrow$ Backend (WSS)**: JSON-framed packets: `{ type: "audio", pcm: "<base64>" }`, `{ type: "interrupt" }`, `{ type: "ping" }`.
+- **Backend $\rightarrow$ Google (WSS)**: Bidi protocol envelopes containing `realtimeInput` with `audio/pcm;rate=16000`.
+- **Google $\rightarrow$ Backend (WSS)**: `serverContent.modelTurn` envelopes with `audio/pcm;rate=24000` and turn completion markers.
 
 ---
 
@@ -286,6 +294,8 @@ graph TD
     end
 ```
 
+- **Primary Source References**: [`apps/frontend/src/App.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/App.tsx), [`Form.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/components/Form.tsx), [`Interview.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/components/Interview.tsx), [`Result.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/components/Result.tsx).
+
 ---
 
 ## 2.2 Frontend State & Hardware Hook Lifecycle
@@ -348,6 +358,10 @@ flowchart TD
     AttachListener --> AutoResumeProtection
 ```
 
+### 💡 Staff Interview Questions & Answers:
+- **Q: What is the browser autoplay policy and why does Safari block audio playback without warm-up?**
+  - **A**: Browsers restrict Web Audio instantiation to direct user gestures (`click`, `keydown`) to prevent intrusive background noise. In `LiveAudioPlayer.warmUp()`, we synchronously create/resume the `AudioContext` and play a 1-sample silent buffer during the initial click event, granting unblocked audio access for all subsequent WebSocket-streamed chunks.
+
 ---
 
 ## 2.4 60 FPS VoiceOrb RMS Energy Visualizer Pipeline
@@ -366,6 +380,9 @@ flowchart LR
         Normalize --> ReactProp["Set React Component Scale & Glow"]
     end
 ```
+
+### Mathematical RMS Equation:
+$$\text{RMS} = \sqrt{\frac{1}{N} \sum_{i=0}^{N-1} \left(\frac{x[i] - 128}{128}\right)^2}$$
 
 ---
 
@@ -396,6 +413,8 @@ graph TD
     AudioConsole --> SpeedPills
     AudioConsole --> DownloadBtn
 ```
+
+- **Primary Source References**: [`apps/frontend/src/components/Result.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/components/Result.tsx), [`audioStorage.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/audioStorage.ts).
 
 ---
 
@@ -470,6 +489,8 @@ flowchart TD
     Queue -->|"Non-blocking Prisma Inserts"| PostgresDB[("PostgreSQL Message Table")]
 ```
 
+- **Primary Source References**: [`apps/backend/services/geminiLive.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/backend/services/geminiLive.ts).
+
 ---
 
 ## 3.3 Upstream Gemini Live Handshake (`BidiGenerateContentSetup`)
@@ -533,6 +554,8 @@ flowchart TD
     CacheSet --> ReturnFresh["Return Sanitized Context & Repos"]
 ```
 
+- **Primary Source References**: [`apps/backend/services/github.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/backend/services/github.ts).
+
 ---
 
 ## 3.6 Multi-Model Evaluation Engine & 25s Timeout Fallback Race
@@ -561,6 +584,8 @@ flowchart TD
     CapRecommendation --> SaveDB["Write Structured JSON to Database & Set status='COMPLETED'"]
     AcceptRecommendation --> SaveDB
 ```
+
+- **Primary Source References**: [`apps/backend/services/evaluation.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/backend/services/evaluation.ts).
 
 ---
 
@@ -591,6 +616,11 @@ sequenceDiagram
     Input-->>User: Render Interactive Repository Cards
 ```
 
+### Under-the-Hood Mechanics:
+- **DOM Event**: `onChange` / `onBlur` handler with 400ms debouncing.
+- **Regex Sanitization**: Matches `^(https?:\/\/github\.com\/)?([a-zA-Z0-9_-]+)(\/[a-zA-Z0-9_.-]+)?$` to parse usernames vs direct repo links.
+- **Rate Limit Defense**: Checks in-memory LRU cache before making network calls, preventing GitHub 60 req/hr rate limits.
+
 ---
 
 ## 4.2 Action: Save Gemini API Key (BYOK Pre-Flight Validation)
@@ -615,6 +645,8 @@ sequenceDiagram
         Modal-->>User: Toast Error: "Invalid API Key. Please check your credentials."
     end
 ```
+
+- **Primary Source References**: [`apps/frontend/src/lib/apiKeyStorage.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/apiKeyStorage.ts), [`ApiKeyModal.tsx`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/components/ApiKeyModal.tsx).
 
 ---
 
@@ -692,6 +724,10 @@ flowchart TD
     ActivePCM --> StreamUpstream["Forward Audio to WebSocket"]
 ```
 
+### 💡 Staff Interview Questions & Answers:
+- **Q: Why modulate GainNode to 0 instead of stopping the MediaStream track during mute?**
+  - **A**: Stopping the MediaStream track causes `MediaRecorder` to stop recording or throw error, desynchronizing the audio timeline. Modulating `micGainNode.gain` to `0` continues to record silent audio frames, ensuring the mixed session recording maintains absolute synchronization with the real-world interview clock.
+
 ---
 
 ## 4.6 Action: Candidate Speaks & Client-Side Barge-In Interruption
@@ -748,6 +784,8 @@ sequenceDiagram
     Room->>Nav: navigate("/result/int_8f3a")
     Nav-->>User: Loads Result.tsx Scorecard Page
 ```
+
+- **Primary Source References**: [`webmDurationPatcher.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/webmDurationPatcher.ts), [`audioStorage.ts`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/audioStorage.ts).
 
 ---
 
@@ -847,6 +885,8 @@ graph TD
         MediaRec --> Blobs["Recorded Audio Chunks Array"]
     end
 ```
+
+- **Primary Source References**: [`apps/frontend/src/lib/audioProcessor.ts:350-480`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/audioProcessor.ts).
 
 ---
 
@@ -954,6 +994,8 @@ flowchart TD
     PatchedBlob --> SeekableResult["✅ Fully Seekable & Scrub-bar Enabled WebM Audio"]
 ```
 
+- **Primary Source References**: [`apps/frontend/src/lib/webmDurationPatcher.ts:1-67`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/frontend/src/lib/webmDurationPatcher.ts).
+
 ---
 
 # Chapter 6: AI Prompting, Turn Cadence & Evaluation Rubric Pipelines
@@ -983,6 +1025,8 @@ graph TD
     SeniorityCheck -->|"MID"| MidTier
     SeniorityCheck -->|"SENIOR"| SeniorTier
 ```
+
+- **Primary Source References**: [`apps/backend/services/promptBuilder.ts:50-280`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/backend/services/promptBuilder.ts).
 
 ---
 
@@ -1076,6 +1120,8 @@ erDiagram
     }
 ```
 
+- **Primary Source References**: [`apps/backend/prisma/schema.prisma`](file:///Users/chirag/Documents/opensource-projects/ai-interviewer/apps/backend/prisma/schema.prisma).
+
 ---
 
 ## 7.2 Asynchronous Non-Blocking Serial Database Write Queue
@@ -1144,16 +1190,13 @@ sequenceDiagram
 
 ---
 
-# 🎓 Quick Interview Cheat Sheet
+# 🎓 Quick Interview Cheat Sheet & Staff Q&A Defense
 
-| Topic | Key Metric / Architectural Principle |
-| :--- | :--- |
-| **P95 Latency** | $\le 350\text{ms}$ turnaround via native Bidi audio streaming (no cascaded STT $\rightarrow$ LLM $\rightarrow$ TTS). |
-| **Audio Capture** | 16kHz Mono Int16 Little-Endian PCM via linear interpolation from 48kHz hardware. |
-| **Playback** | Gapless 24kHz AudioBuffer scheduling with cursor `nextPlayTime`. |
-| **Barge-In** | Client-side RMS detection ($>0.04$) instantly drains active source nodes and notifies backend. |
-| **Recording** | Zero server cost; dual-track mixed in Web Audio DSP graph, cached in IndexedDB with 5-session LRU cap. |
-| **WebM Bug** | In-place EBML duration patching (`0x4489`) fixes Chromium's `Infinity` duration bug. |
-| **Anti-Sycophancy** | Hard gate at `technicalAccuracy < 4.5` enforces `No Hire` regardless of candidate communication polish. |
-| **Concurrency** | Single-threaded non-blocking event loop using `dbWriteQueue` micro-task serialization. |
-| **BYOK Security** | Zero-persistence model; candidate keys stored solely in client `localStorage` and passed via headers. |
+| Technical Question | Key Metric / Architectural Principle | Staff-Level Defense Formulation |
+| :--- | :--- | :--- |
+| **Why not STT $\rightarrow$ LLM $\rightarrow$ TTS?** | $\le 350\text{ms}$ P95 Turnaround Latency | Cascaded 3-hop systems incur $1.2-2.5\text{s}$ latency due to sequential text chunk serialization and multiple network hops. Multimodal audio streaming processes tokens directly in the acoustic domain over a single bidirectional WebSocket. |
+| **How is candidate barge-in handled?** | Client-Side RMS Detection ($>0.04$) | Web Audio `AnalyserNode` monitors microphone energy on the audio thread. When RMS exceeds threshold, the browser instantly stops active `AudioBufferSourceNodes` and sends `{ type: "interrupt" }` upstream to halt AI generation. |
+| **Why WebM duration patching?** | Chromium Bug `crbug/642012` | `MediaRecorder` writes `Infinity` duration for live streams. `fixWebmDuration` parses the EBML tree, finds Element `0x1549A966` (Segment Info) and Tag `0x4489` (Duration), and injects Big-Endian float duration in milliseconds so HTML5 scrubbers work. |
+| **How to prevent DB bottlenecks in single-threaded event loops?** | Serial Promise Queue (`dbWriteQueue`) | Database writes are scheduled as non-blocking microtasks. Even under high database latency, the WebSocket thread continues streaming PCM chunks with $0\text{ms}$ blocking. |
+| **How does anti-sycophancy work?** | Hard Gate at `accuracy < 4.5` | If core technical accuracy falls below $4.5/10$, the recommendation is programmatically clamped to `Lean No Hire` or `No Hire`, preventing polite introductory chat or charismatic delivery from overriding technical gaps. |
+| **How is BYOK secured?** | Zero Backend Storage | Candidate keys remain strictly in browser `localStorage`, are transmitted via `x-gemini-api-key` headers over TLS, and are never logged or stored in PostgreSQL. |

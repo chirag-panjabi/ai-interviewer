@@ -22,7 +22,9 @@ import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
 import { getBackendWsUrl } from "@/lib/config";
 import { getCustomApiKey } from "@/lib/apiKeyStorage";
-import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
+import { LiveAudioPlayer, LiveMicrophoneRecorder, SessionAudioRecorder } from "@/lib/audioProcessor";
+import { saveSessionAudio } from "@/lib/audioStorage";
+import { fixWebmDuration } from "@/lib/webmDurationPatcher";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "error";
@@ -73,6 +75,7 @@ export function Interview() {
   const socketRef = useRef<WebSocket | null>(null);
   const playerRef = useRef<LiveAudioPlayer | null>(null);
   const recorderRef = useRef<LiveMicrophoneRecorder | null>(null);
+  const sessionRecorderRef = useRef<SessionAudioRecorder | null>(null);
   const rafRef = useRef<number | null>(null);
   const [isOffline, setIsOffline] = useState(false);
 
@@ -80,6 +83,9 @@ export function Interview() {
     const nextMuted = !isMuted;
     isMutedRef.current = nextMuted;
     setIsMuted(nextMuted);
+    if (sessionRecorderRef.current) {
+      sessionRecorderRef.current.setMute(nextMuted);
+    }
   };
 
   const startMicTest = async () => {
@@ -249,6 +255,16 @@ export function Interview() {
           if (data.type === "ready") {
             if (data.model) setActiveModel(data.model);
             setStatus("live");
+
+            // Start dual-track session audio recording when interview goes live
+            if (!sessionRecorderRef.current && recorderRef.current && playerRef.current) {
+              const micStream = recorderRef.current.getMediaStream();
+              if (micStream) {
+                const sessionRec = new SessionAudioRecorder();
+                sessionRec.start(micStream, playerRef.current);
+                sessionRecorderRef.current = sessionRec;
+              }
+            }
           } else if (data.type === "audio" && data.pcm) {
             player.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
@@ -304,11 +320,24 @@ export function Interview() {
       }
     };
     const handleOffline = () => setIsOffline(true);
+    const handleBeforeUnload = () => {
+      if (sessionRecorderRef.current && interviewId && statusRef.current === "live") {
+        const flushed = sessionRecorderRef.current.flush();
+        if (flushed && flushed.blob.size > 0) {
+          const durationSec = Math.floor((Date.now() - (callStartTimeRef.current || Date.now())) / 1000);
+          saveSessionAudio(interviewId, flushed.blob, flushed.mimeType, flushed.extension, durationSec).catch(() => {});
+        }
+      }
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       cleanup();
     };
   }, []);
@@ -325,9 +354,29 @@ export function Interview() {
     stopMicTest(false);
   }
 
-  function endInterview() {
-    cleanup();
-    navigate(`/result/${interviewId}`);
+  async function endInterview() {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
+    setStatus("ending");
+
+    const durationSec = elapsedSeconds || (callStartTimeRef.current ? Math.floor((Date.now() - callStartTimeRef.current) / 1000) : 0);
+
+    try {
+      if (sessionRecorderRef.current && interviewId) {
+        const { blob, mimeType, extension } = await sessionRecorderRef.current.stop();
+        if (blob.size > 0) {
+          const finalBlob = await fixWebmDuration(blob, durationSec * 1000);
+          await saveSessionAudio(interviewId, finalBlob, mimeType, extension, durationSec);
+          console.log(`[Interview] Saved session audio: ${finalBlob.size} bytes (${durationSec}s)`);
+        }
+      }
+    } catch (err) {
+      console.warn("[Interview] Failed to finalize session audio recording:", err);
+    } finally {
+      sessionRecorderRef.current = null;
+      cleanup();
+      navigate(`/result/${interviewId}`);
+    }
   }
 
   const formatTimer = (sec: number) => {

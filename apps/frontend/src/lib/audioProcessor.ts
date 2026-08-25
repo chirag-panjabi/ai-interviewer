@@ -4,10 +4,12 @@
  * - Browser Autoplay & User-Gesture warm-up
  * - Low latency microphone streaming at 16kHz mono Int16 PCM
  * - Real-time VoiceOrb RMS meter
+ * - Dual-track SessionAudioRecorder mixing candidate mic + AI interviewer with zero JS GC overhead
  */
 
 export class LiveAudioPlayer {
   private ctx: AudioContext | null = null;
+  private masterGainNode: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private analyserData: Uint8Array | null = null;
   private nextPlayTime = 0;
@@ -27,11 +29,16 @@ export class LiveAudioPlayer {
           // Safari WebKit does not allow custom sampleRate on new AudioContext
           this.ctx = new AudioCtx();
         }
+
+        this.masterGainNode = this.ctx.createGain();
+        this.masterGainNode.gain.value = 1.0;
+        this.masterGainNode.connect(this.ctx.destination);
+
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 256;
         this.analyser.smoothingTimeConstant = 0.8;
         this.analyserData = new Uint8Array(this.analyser.fftSize);
-        this.analyser.connect(this.ctx.destination);
+        this.masterGainNode.connect(this.analyser);
       }
 
       if (this.ctx.state === "suspended") {
@@ -49,7 +56,7 @@ export class LiveAudioPlayer {
       const silentBuffer = this.ctx.createBuffer(1, 24, 24000);
       const source = this.ctx.createBufferSource();
       source.buffer = silentBuffer;
-      source.connect(this.ctx.destination);
+      source.connect(this.masterGainNode || this.ctx.destination);
       source.start(0);
 
       this.nextPlayTime = this.ctx.currentTime;
@@ -57,6 +64,14 @@ export class LiveAudioPlayer {
     } catch (e) {
       console.warn("[LiveAudioPlayer] Warm-up error:", e);
     }
+  }
+
+  public getContext(): AudioContext | null {
+    return this.ctx;
+  }
+
+  public getMasterGain(): GainNode | null {
+    return this.masterGainNode;
   }
 
   public async resume(): Promise<boolean> {
@@ -92,7 +107,9 @@ export class LiveAudioPlayer {
     }
 
     try {
-      const binary = window.atob(base64Pcm);
+      const binary = typeof globalThis.atob !== "undefined"
+        ? globalThis.atob(base64Pcm)
+        : Buffer.from(base64Pcm, "base64").toString("binary");
       const len = binary.length;
       if (len < 2) return;
 
@@ -115,12 +132,12 @@ export class LiveAudioPlayer {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
 
-      // Connect source to destination for audible playback
-      source.connect(ctx.destination);
-
-      // Also connect to analyser for visualizer
-      if (this.analyser) {
-        source.connect(this.analyser);
+      // Connect source to masterGainNode (which feeds hardware speakers, visualizer, and session recorder)
+      if (this.masterGainNode) {
+        source.connect(this.masterGainNode);
+      } else {
+        source.connect(ctx.destination);
+        if (this.analyser) source.connect(this.analyser);
       }
 
       const now = ctx.currentTime;
@@ -176,6 +193,14 @@ export class LiveAudioPlayer {
 
   public close(): void {
     this.interrupt();
+    if (this.masterGainNode) {
+      try { this.masterGainNode.disconnect(); } catch {}
+      this.masterGainNode = null;
+    }
+    if (this.analyser) {
+      try { this.analyser.disconnect(); } catch {}
+      this.analyser = null;
+    }
     if (this.ctx && this.ctx.state !== "closed") {
       this.ctx.close().catch(() => {});
       this.ctx = null;
@@ -201,7 +226,9 @@ export function float32ToBase64PCM(input: Float32Array): string {
     const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
     binary += String.fromCharCode.apply(null, chunk as any);
   }
-  return window.btoa(binary);
+  return typeof globalThis.btoa !== "undefined"
+    ? globalThis.btoa(binary)
+    : Buffer.from(binary, "binary").toString("base64");
 }
 
 // Downsample Float32Array to 16kHz
@@ -303,6 +330,10 @@ export class LiveMicrophoneRecorder {
     this.silentGainNode.connect(this.audioCtx.destination);
   }
 
+  public getMediaStream(): MediaStream | null {
+    return this.mediaStream;
+  }
+
   public getVolumeLevel(): number {
     return this.currentVolume;
   }
@@ -343,5 +374,170 @@ export class LiveMicrophoneRecorder {
       this.mediaStream = null;
     }
     this.currentVolume = 0;
+  }
+}
+
+/**
+ * Dual-Track Session Audio Recorder
+ * - Dynamically negotiates supported browser codec (.webm on Chromium, .m4a on Safari)
+ * - Mixes candidate microphone and AI interviewer audio inside native Web Audio DSP graph
+ * - Enforces 2-second timeslice chunk streaming for background-tab throttling immunity
+ */
+export class SessionAudioRecorder {
+  private recorder: MediaRecorder | null = null;
+  private chunks: Blob[] = [];
+  private audioCtx: AudioContext | null = null;
+  private mixerDestination: MediaStreamAudioDestinationNode | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
+  private micGain: GainNode | null = null;
+  private aiGain: GainNode | null = null;
+  private chosenMime = "audio/webm;codecs=opus";
+  private chosenExt = "webm";
+  private isRecording = false;
+
+  constructor() {
+    this.detectSupportedMime();
+  }
+
+  private detectSupportedMime(): void {
+    const MIME_CANDIDATES = [
+      { type: "audio/webm;codecs=opus", ext: "webm" },
+      { type: "audio/webm", ext: "webm" },
+      { type: "audio/mp4", ext: "m4a" },
+      { type: "audio/aac", ext: "m4a" },
+      { type: "audio/ogg;codecs=opus", ext: "ogg" },
+      { type: "audio/wav", ext: "wav" },
+    ];
+
+    if (typeof window !== "undefined" && typeof MediaRecorder !== "undefined") {
+      for (const candidate of MIME_CANDIDATES) {
+        if (MediaRecorder.isTypeSupported(candidate.type)) {
+          this.chosenMime = candidate.type;
+          this.chosenExt = candidate.ext;
+          console.log(`[SessionAudioRecorder] Selected native audio codec: ${candidate.type} (.${candidate.ext})`);
+          return;
+        }
+      }
+    }
+  }
+
+  public getExtension(): string {
+    return this.chosenExt;
+  }
+
+  public getMimeType(): string {
+    return this.chosenMime;
+  }
+
+  public start(micStream: MediaStream, player: LiveAudioPlayer): void {
+    if (this.isRecording) return;
+
+    try {
+      const playerCtx = player.getContext();
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioCtx = playerCtx || new AudioCtx();
+
+      if (this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+
+      // Create shared session mixer destination
+      this.mixerDestination = this.audioCtx.createMediaStreamDestination();
+
+      // Route 1: Microphone stream with 1.05x gain
+      this.micSource = this.audioCtx.createMediaStreamSource(micStream);
+      this.micGain = this.audioCtx.createGain();
+      this.micGain.gain.value = 1.05;
+      this.micSource.connect(this.micGain);
+      this.micGain.connect(this.mixerDestination);
+
+      // Route 2: AI Player master output with 0.95x gain headroom
+      const aiMasterGain = player.getMasterGain();
+      if (aiMasterGain) {
+        this.aiGain = this.audioCtx.createGain();
+        this.aiGain.gain.value = 0.95;
+        aiMasterGain.connect(this.aiGain);
+        this.aiGain.connect(this.mixerDestination);
+      }
+
+      // Initialize MediaRecorder on the mixed destination stream
+      const options: MediaRecorderOptions = {};
+      if (this.chosenMime) {
+        options.mimeType = this.chosenMime;
+      }
+
+      this.chunks = [];
+      this.recorder = new MediaRecorder(this.mixerDestination.stream, options);
+
+      this.recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.chunks.push(e.data);
+        }
+      };
+
+      // 2000ms timeslice guarantees continuous chunk flushing even in backgrounded tabs
+      this.recorder.start(2000);
+      this.isRecording = true;
+      console.log("[SessionAudioRecorder] Active recording started with codec:", this.chosenMime);
+    } catch (err) {
+      console.warn("[SessionAudioRecorder] Failed to start recording session:", err);
+    }
+  }
+
+  public setMute(isMuted: boolean): void {
+    if (this.micGain && this.audioCtx) {
+      this.micGain.gain.setValueAtTime(isMuted ? 0 : 1.05, this.audioCtx.currentTime);
+    }
+  }
+
+  public stop(): Promise<{ blob: Blob; mimeType: string; extension: string }> {
+    return new Promise((resolve) => {
+      if (!this.recorder || this.recorder.state === "inactive") {
+        const finalBlob = new Blob(this.chunks, { type: this.chosenMime });
+        this.cleanup();
+        return resolve({ blob: finalBlob, mimeType: this.chosenMime, extension: this.chosenExt });
+      }
+
+      const onStopHandler = () => {
+        const finalBlob = new Blob(this.chunks, { type: this.chosenMime });
+        this.cleanup();
+        resolve({ blob: finalBlob, mimeType: this.chosenMime, extension: this.chosenExt });
+      };
+
+      this.recorder.onstop = onStopHandler;
+
+      try {
+        this.recorder.stop();
+      } catch {
+        onStopHandler();
+      }
+    });
+  }
+
+  public flush(): { blob: Blob; mimeType: string; extension: string } | null {
+    if (this.chunks.length === 0) return null;
+    return {
+      blob: new Blob(this.chunks, { type: this.chosenMime }),
+      mimeType: this.chosenMime,
+      extension: this.chosenExt,
+    };
+  }
+
+  private cleanup(): void {
+    this.isRecording = false;
+    if (this.micSource) {
+      try { this.micSource.disconnect(); } catch {}
+      this.micSource = null;
+    }
+    if (this.micGain) {
+      try { this.micGain.disconnect(); } catch {}
+      this.micGain = null;
+    }
+    if (this.aiGain) {
+      try { this.aiGain.disconnect(); } catch {}
+      this.aiGain = null;
+    }
+    this.mixerDestination = null;
+    this.recorder = null;
   }
 }

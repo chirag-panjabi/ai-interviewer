@@ -104,6 +104,22 @@ GitHub preview fails to load candidate repositories or logs: `API rate limit exc
 
 ---
 
+### Issue 6: Audio Recording Not Available on Scorecard
+
+#### Symptoms:
+The results page displays the scorecard and transcript, but the "Session Audio Recording" console card is missing.
+
+#### Causes & Resolution:
+1. **Opened from a Different Device or Incognito Tab**:
+   - Audio recordings are saved in the local browser's **IndexedDB** (`audioStorage.ts`) to avoid third-party server storage fees and protect candidate privacy.
+   - If the scorecard URL is opened on a different machine or in a fresh incognito session, the server transcript is available, but the local audio file is only present on the original recording browser.
+   - **Resolution**: Use the **"Download Recording"** button on the original machine to export `.webm` or `.m4a` files for sharing.
+2. **Audio Autoplay Blocked (iOS / Safari)**:
+   - Mobile Safari blocks audio playback until a user explicitly taps the Play button.
+   - Ensure the user taps the Play button directly.
+
+---
+
 ## 3. Essential Developer & Verification Commands
 
 ```bash
@@ -116,11 +132,11 @@ cd apps/backend && bun run index.ts
 # 3. Run frontend isolated
 cd apps/frontend && bun run dev
 
-# 4. Generate Prisma client & update PostgreSQL schema
-cd apps/backend && bunx prisma generate && bunx prisma db push
+# 4. Run frontend unit tests (audio processor, storage, WebM duration patcher)
+cd apps/frontend && bun test
 
-# 5. Check backend TypeScript build
-cd apps/backend && bun build --target node ./index.ts --outfile /dev/null
+# 5. Generate Prisma client & update PostgreSQL schema
+cd apps/backend && bunx prisma generate && bunx prisma db push
 
 # 6. Run prompt invariant regression suite
 cd apps/backend && bun run test:prompts
@@ -128,9 +144,6 @@ cd apps/backend && bun run test:prompts
 # 7. Run evaluation dossier calibration suite
 cd apps/backend && bun run test:evals
 
-# 8. Check frontend TypeScript compilation
-cd apps/frontend && bunx tsc --noEmit
-
-# 9. Build frontend production distribution
-cd apps/frontend && bun run build
+# 8. Check frontend TypeScript compilation & build
+cd apps/frontend && bunx tsc --noEmit && bun run build
 ```

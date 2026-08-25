@@ -195,3 +195,95 @@ To guarantee zero audio drops:
 - `sourceNode`, `processorNode`, and `silentGainNode` are permanently stored as instance properties on `LiveMicrophoneRecorder`.
 - An explicit `silentGainNode` (`gain.value = 0`) connects the processor to `destination` to maintain an active Web Audio graph topology without generating feedback.
 - `cleanup()` properly disconnects all nodes, cancels animation frames, stops media tracks, and closes the `AudioContext`.
+
+---
+
+## 6. Dual-Track Client Session Recording (`SessionAudioRecorder`)
+
+```mermaid
+flowchart TD
+    subgraph MasterContext ["Shared Web Audio Graph (audioProcessor.ts)"]
+        MicSource["Candidate Mic (MediaStreamSourceNode)"] --> MicGain["Mic GainNode (1.05x + Mute Sync)"]
+        AIBuffers["AI Audio Output (masterGainNode)"] --> AIGain["AI GainNode (0.95x Headroom)"]
+        
+        MicGain --> CombinedMixer["Session Mixer (MediaStreamAudioDestinationNode)"]
+        AIGain --> CombinedMixer
+        AIGain --> HardwareSpeaker["ctx.destination (Candidate Ear)"]
+    end
+
+    subgraph RecordingPipeline ["Client-Side Recording Pipeline"]
+        CombinedMixer --> MediaRecorder["MediaRecorder (2s Timeslice Streaming)"]
+        MediaRecorder -->|"Dynamic Codec Negotiation"| CodecChoice{"Platform Negotiation"}
+        CodecChoice -->|"Chromium / Firefox"| WebM["audio/webm;codecs=opus"]
+        CodecChoice -->|"Safari / macOS / iOS"| M4A["audio/mp4 / audio/aac (.m4a)"]
+        CodecChoice -->|"Fallback"| WAV["audio/wav"]
+        
+        WebM --> EBMLFixer["EBML Duration Patcher (fixWebmDuration)"]
+    end
+
+    subgraph StorageLayer ["Client-Side Persistence (audioStorage.ts)"]
+        EBMLFixer --> IDB[("IndexedDB Store<br/>(LRU Cap: 5 Sessions / 7-Day TTL)")]
+        M4A --> IDB
+        WAV --> IDB
+    end
+
+    subgraph ResultView ["Scorecard Page (Result.tsx)"]
+        IDB -->|"Load Blob + Duration"| PlayerConsole["Audio Review Console (Scrubber, Speed 1x-2x)"]
+        IDB -->|"Download .webm / .m4a"| DownloadAction["Slugified Audio Download"]
+    end
+```
+
+### Key Technical Characteristics:
+1. **Zero Main-Thread Latency**: Mixing candidate microphone audio and AI playback buffers occurs inside the browser's native C++ Web Audio DSP graph with $0\text{ms}$ delay and zero garbage collection pauses.
+2. **Dynamic Codec Negotiation**: Probes `MediaRecorder.isTypeSupported()` to automatically select `.m4a` (`audio/mp4` / `audio/aac`) for Safari/macOS/iOS (ensuring instant Apple QuickTime playback) and `.webm` (`audio/webm;codecs=opus`) for Chromium/Firefox.
+3. **Timeline-Preserving Muting**: When candidate toggles mute, `micGain.gain` is set to `0`, continuing to record silence so the conversational timeline remains in lockstep with real time.
+4. **2-Second Timeslice Streaming**: `MediaRecorder.start(2000)` flushes buffers every 2 seconds, preventing buffer overflow and ensuring continuous recording when browser tabs are backgrounded.
+
+---
+
+## 7. WebM EBML Duration Header Patcher (`webmDurationPatcher.ts`)
+
+### Problem (Chromium Bug [crbug.com/642012](https://bugs.chromium.org/p/chromium/issues/detail?id=642012))
+When `MediaRecorder` writes a streaming WebM file, it creates the container header at the *beginning* of the stream before total duration is known, setting the duration metadata to `Infinity`. As a result, standard HTML5 `<audio>` tags cannot seek or scrub through the audio timeline.
+
+### In-Place Header Patching Solution
+`fixWebmDuration()` scans the EBML byte array, locates the `Segment Info` element (`0x1549A966`) and `Duration` tag (`0x4489`), and injects the measured session duration in milliseconds (Big-Endian Float32 or Float64):
+```ts
+export async function fixWebmDuration(blob: Blob, durationMs: number): Promise<Blob> {
+  if (!blob.type.includes("webm")) return blob;
+  const arrayBuffer = await blob.arrayBuffer();
+  const patchedBuffer = patchEbmlDuration(arrayBuffer, durationMs);
+  return new Blob([patchedBuffer], { type: blob.type });
+}
+```
+
+---
+
+## 8. IndexedDB Audio Storage & LRU Eviction (`audioStorage.ts`)
+
+To support instant replay on the scorecard without third-party cloud storage costs or egress bandwidth, audio recordings are stored in client browser `IndexedDB` (`ai_interviewer_audio_db`):
+
+- **Data Schema**:
+  ```ts
+  export interface StoredAudioRecording {
+    id: string;          // interviewId
+    blob: Blob;          // Encoded audio Blob
+    mimeType: string;    // e.g. "audio/webm;codecs=opus" or "audio/mp4"
+    extension: string;   // "webm" | "m4a" | "wav"
+    duration: number;    // Duration in seconds
+    timestamp: number;   // Creation timestamp
+  }
+  ```
+- **LRU 5-Session Auto-Eviction**: Enforces a strict cap of the **5 most recent interview recordings** and purges recordings older than 7 days, bounding browser storage consumption strictly $\le 50\text{MB}$.
+- **In-Memory Cache Fallback**: Maintains an in-memory Map cache so navigation from `/interview/:id` to `/result/:id` loads instantly even if IndexedDB is restricted.
+
+---
+
+## 9. Audio Review Console on Scorecard (`Result.tsx`)
+
+The results page (`/result/:id`) embeds an **Audio Recording Review** console above the transcript:
+- **Interactive Scrubber**: Custom slider with timestamp counter (`02:15 / 14:30`) allowing smooth seeking across the entire interview.
+- **Transport Controls**: Play/Pause button with $\pm 5\text{s}$ quick skip.
+- **Speed Selectors**: One-click toggles for $1.0\times, 1.25\times, 1.5\times, 2.0\times$ playback rate.
+- **Slugified Download Action**: Downloads the recording locally with clean slugified filenames (e.g. `ai-interview-full-mock-screen-35cdddf2.webm`).
+

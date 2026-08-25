@@ -89,16 +89,17 @@ ai-interviewer/
 │   └── frontend/                # React 19 + Vite + Tailwind CSS Single-Page App
 │       ├── src/
 │       │   ├── components/      # Form.tsx, Interview.tsx, Result.tsx, ApiKeyModal.tsx
-│       │   ├── lib/             # audioProcessor.ts, apiKeyStorage.ts, config.ts, utils.ts
+│       │   ├── lib/             # audioProcessor.ts, audioStorage.ts, webmDurationPatcher.ts, apiKeyStorage.ts, config.ts, utils.ts
 │       │   ├── App.tsx          # Root router & layout
 │       │   └── index.css        # Tailwind design tokens & typography
+│       ├── tests/               # Frontend unit tests (audioProcessor, audioStorage, webmDurationPatcher)
 │       ├── build.ts             # Custom Bun production bundler script
 │       └── package.json
 ├── packages/
 │   ├── ui/                      # Shared UI components (shadcn/ui primitives)
 │   ├── eslint-config/           # Monorepo linting standards
 │   └── typescript-config/       # Base tsconfig rules
-├── docs/                        # Internal engineering documentation (git-ignored)
+├── docs/                        # Internal engineering documentation
 ├── turbo.json                   # Turborepo task pipeline
 └── package.json                 # Root monorepo workspace manifest
 ```
@@ -118,7 +119,7 @@ ai-interviewer/
    - Backend creates an `Interview` record in PostgreSQL with status `CREATED` and returns `{ id: interviewId }`.
    - Frontend navigates to `/interview/:interviewId`.
 
-### Phase 2: Live Bi-Directional Audio Session
+### Phase 2: Live Bi-Directional Audio Session & Local Recording
 1. In `Interview.tsx`, the client requests microphone access and connects to `wss://<host>/api/v1/live/:interviewId`.
 2. Backend validates the interview ID, retrieves candidate metadata from the database, and sets interview status to `IN_PROGRESS`.
 3. `promptBuilder.ts` composes the full system prompt tailored to the candidate's track, seniority level, and GitHub project context.
@@ -126,12 +127,14 @@ ai-interviewer/
 5. Once Gemini Live confirms `setupComplete`, Alex speaks the opening turn over audio.
 6. The candidate speaks into the microphone:
    - `LiveMicrophoneRecorder` captures audio, downsamples to 16kHz mono 16-bit PCM, and transmits base64 chunks over WebSocket.
+   - `SessionAudioRecorder` simultaneously captures dual-track audio (mic input + AI playback) inside the native Web Audio DSP graph.
    - Gemini Live streams 24kHz PCM audio chunks back to the backend.
    - Backend forwards PCM audio chunks to the browser, where `LiveAudioPlayer` schedules seamless AudioBuffer playback.
    - User and Assistant transcription turns are continuously persisted into the `Message` table in PostgreSQL.
 
 ### Phase 3: Post-Interview Evaluation & Scorecard Dossier
-1. Candidate finishes the interview by clicking **"End Interview"** or closing the session.
+1. Candidate finishes the interview by clicking **"End Interview"**:
+   - `SessionAudioRecorder` finalizes the dual-track recording, patches the WebM EBML duration header via `fixWebmDuration()`, and persists the audio Blob into client `IndexedDB` (`audioStorage.ts`).
 2. Frontend transitions to `/result/:interviewId` and queries `GET /api/v1/result/:interviewId`.
 3. If not already evaluated:
    - Backend sets interview status to `EVALUATING`.
@@ -139,7 +142,7 @@ ai-interviewer/
    - Backend calls Google Gemini Flash model with structured JSON schema output.
    - The returned scorecard (overall score, hiring recommendation, executive summary, 4-pillar category grades, evidence quotes, strengths, and improvements) is saved to the database.
    - Status transitions to `COMPLETED`.
-4. Frontend renders the **Executive Engineering Dossier** with real-time transcript search and export capabilities.
+4. Frontend renders the **Executive Engineering Dossier** alongside the **Audio Review Console** (scrubber, speed pills $1.0\times\text{--}2.0\times$, and one-click audio download).
 
 ---
 
@@ -147,7 +150,8 @@ ai-interviewer/
 
 | Invariant | Implementation Mechanism |
 | :--- | :--- |
-| **Sub-100ms Turn Latency** | Direct PCM stream over WebSockets without intermediate server-side audio file storage or transcription hops. |
+| **Sub-350ms Turn Latency** | Direct PCM stream over WebSockets without intermediate server-side audio file storage or transcription hops. |
+| **Zero-Cost Client Audio Recording** | Native C++ Web Audio graph mixer combines mic + AI playback into `.m4a` (Safari) or `.webm` (Chromium) with EBML duration patching and IndexedDB caching ($0\text{ cloud storage/egress}$). |
 | **Anti-Sycophancy Grading** | `technicalAccuracy < 4.5` strictly caps hiring recommendation at `Lean No Hire`, preventing introductory charisma from masking technical gaps. |
 | **Zero False Competency** | The anti-spoonfeeding rule awards zero depth credit if the interviewer supplied the technical answer or completed the candidate's sentence. |
 | **Resilient Reconnection** | 30-second disconnect grace period preserves the active Gemini session. Past transcript turns are injected upon reconnection. |

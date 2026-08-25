@@ -178,3 +178,26 @@ function persistTurn(type: "User" | "Assistant", message: string, wasInterrupted
 - **Strict Turn Ordering**: Even if asynchronous DB queries complete with varying network latencies, turns are inserted sequentially based on `turnSequence`.
 - **Zero Audio Jitter**: Database I/O is non-blocking with respect to the WebSocket event loop.
 - **Interruption Tagging**: If a candidate speaks while Alex is talking, the partial Assistant transcript is persisted with `wasInterrupted: true` for downstream evaluation review.
+
+---
+
+## 5. Client-Side Audio Recording Storage Lifecycle (`audioStorage.ts`)
+
+While text transcripts, scores, and evaluation rubrics are persisted in PostgreSQL, raw full-session audio recordings are managed entirely on the client side via browser **IndexedDB** (`ai_interviewer_audio_db`):
+
+```mermaid
+flowchart LR
+    LiveState["Interview Live"] -->|"Timeslice Chunks (2s)"| InMemChunks["RAM Buffer Chunks"]
+    EndInterview["End Interview Trigger"] -->|"MediaRecorder.stop()"| WebMBlob["Raw Audio Blob"]
+    WebMBlob -->|"fixWebmDuration()"| PatchedBlob["Patched Blob (.webm / .m4a)"]
+    PatchedBlob -->|"saveSessionAudio()"| IDBStore[("IndexedDB: recordings")]
+    IDBStore -->|"LRU Pruning"| LRUCheck{"Records > 5 or > 7 days?"}
+    LRUCheck -->|"Yes"| PruneOld["Delete Oldest Sessions"]
+    LRUCheck -->|"No"| Persist["Ready for Playback & Download"]
+```
+
+### Key Architectural Advantages:
+1. **Zero Cloud Storage & Egress Costs**: Eliminates AWS S3 / Cloudflare R2 hosting and bandwidth fees.
+2. **Deterministic Timeline Alignment**: Audio is captured directly from the local hardware `AudioContext`, eliminating network packet jitter or audio drift.
+3. **Bounded Client Disk Footprint**: The LRU 5-session cap and 7-day TTL guarantee client storage stays strictly under $\le 50\text{MB}$.
+

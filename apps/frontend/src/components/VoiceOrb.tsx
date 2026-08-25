@@ -1,6 +1,6 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Studio-Node · theme: custom-carbon · states: default · active · speaking · muted */
 
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 import type { LucideIcon } from "lucide-react";
 
 interface VoiceOrbProps {

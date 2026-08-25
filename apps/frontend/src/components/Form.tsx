@@ -1,11 +1,11 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Workbench · theme: custom-carbon · states: default · hover · focus · active · disabled · loading */
 
 import { useState, useRef, useEffect } from "react";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { toast } from "sonner";
 import axios from "axios";
-import { BACKEND_URL } from "@/lib/config";
+import { BACKEND_URL } from "../lib/config";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -31,9 +31,9 @@ import {
   Star,
   FolderGit2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 import { ApiKeyModal } from "./ApiKeyModal";
-import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "@/lib/apiKeyStorage";
+import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "../lib/apiKeyStorage";
 
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
 

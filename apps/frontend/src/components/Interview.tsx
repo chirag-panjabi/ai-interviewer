@@ -20,12 +20,12 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
-import { getBackendWsUrl } from "@/lib/config";
-import { getCustomApiKey } from "@/lib/apiKeyStorage";
-import { LiveAudioPlayer, LiveMicrophoneRecorder, SessionAudioRecorder } from "@/lib/audioProcessor";
-import { saveSessionAudio } from "@/lib/audioStorage";
-import { fixWebmDuration } from "@/lib/webmDurationPatcher";
-import { cn } from "@/lib/utils";
+import { getBackendWsUrl } from "../lib/config";
+import { getCustomApiKey } from "../lib/apiKeyStorage";
+import { LiveAudioPlayer, LiveMicrophoneRecorder, SessionAudioRecorder } from "../lib/audioProcessor";
+import { saveSessionAudio } from "../lib/audioStorage";
+import { fixWebmDuration } from "../lib/webmDurationPatcher";
+import { cn } from "../lib/utils";
 
 type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "error";
 

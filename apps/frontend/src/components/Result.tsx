@@ -1,7 +1,7 @@
 /* Hallmark · genre: modern-minimal · macrostructure: Executive-Dossier · theme: custom-carbon · states: default · hover · focus · active · disabled · loading */
 
-import { BACKEND_URL } from "@/lib/config";
-import { getCustomApiKey } from "@/lib/apiKeyStorage";
+import { BACKEND_URL } from "../lib/config";
+import { getCustomApiKey } from "../lib/apiKeyStorage";
 import axios from "axios";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -31,8 +31,8 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
-import { getSessionAudio, type SessionAudioResult } from "@/lib/audioStorage";
-import { cn } from "@/lib/utils";
+import { getSessionAudio, type SessionAudioResult } from "../lib/audioStorage";
+import { cn } from "../lib/utils";
 
 interface CategoryScore {
   score: number;

@@ -24,7 +24,7 @@ import {
   verifyGeminiApiKey,
 } from "../lib/apiKeyStorage";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface ApiKeyModalProps {
   isOpen: boolean;

@@ -3,7 +3,7 @@
 import { BACKEND_URL } from "@/lib/config";
 import { getCustomApiKey } from "@/lib/apiKeyStorage";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   Loader2,
@@ -24,10 +24,14 @@ import {
   Plus,
   X,
   Sparkles,
+  Play,
+  Pause,
+  Headphones,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
+import { getSessionAudio, type SessionAudioResult } from "@/lib/audioStorage";
 import { cn } from "@/lib/utils";
 
 interface CategoryScore {
@@ -121,6 +125,25 @@ export function Result() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "Assistant" | "User">("all");
 
+  // Client-Side Session Audio Player State
+  const [audioData, setAudioData] = useState<SessionAudioResult | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load session audio from IndexedDB / memory cache on mount
+  useEffect(() => {
+    if (interviewId) {
+      getSessionAudio(interviewId).then((data) => {
+        if (data) {
+          setAudioData(data);
+          console.log(`[Result] Loaded session audio recording: ${data.extension}, duration: ${data.duration}s`);
+        }
+      });
+    }
+  }, [interviewId]);
+
   useEffect(() => {
     let intervalId: any = null;
 
@@ -168,6 +191,62 @@ export function Result() {
 
   const ready = result.status === "COMPLETED" || result.status === "Done";
   const evalData = result.evaluationData;
+
+  const formatAudioTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const togglePlayPause = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err: any) => {
+        console.warn("Audio playback error:", err);
+      });
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value);
+    setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleSkip = (seconds: number) => {
+    if (!audioRef.current) return;
+    const maxDur = audioData?.duration || audioRef.current.duration || 0;
+    const targetTime = Math.max(0, Math.min(maxDur, audioRef.current.currentTime + seconds));
+    audioRef.current.currentTime = targetTime;
+    setCurrentTime(targetTime);
+  };
+
+  const changePlaybackRate = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+    }
+  };
+
+  const handleDownloadAudio = () => {
+    if (!audioData || !interviewId) return;
+    const safeTrack = (result.track || "interview").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const filename = `ai-interview-${safeTrack}-${interviewId.slice(0, 8)}.${audioData.extension}`;
+    const a = document.createElement("a");
+    a.href = audioData.url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success(`Downloaded recording (${filename})`);
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -526,7 +605,145 @@ export function Result() {
               </div>
             )}
 
-            {/* 5. Full Audio Transcript */}
+            {/* 5. Session Audio Recording Review Console */}
+            {audioData && (
+              <div className="rounded-2xl border border-primary/30 bg-card/70 p-5 sm:p-6 shadow-sm space-y-4 relative overflow-hidden" data-no-print>
+                <div className="absolute top-0 right-0 h-24 w-24 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/40 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="size-9 rounded-xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary">
+                      <Headphones className="size-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground">
+                          Session Audio Recording
+                        </span>
+                        <span className="rounded bg-primary/15 border border-primary/30 px-1.5 py-0.2 text-[10px] font-bold text-primary uppercase font-mono">
+                          .{audioData.extension}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                        Total Duration: {formatAudioTime(audioData.duration)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Download Button */}
+                  <Button
+                    onClick={handleDownloadAudio}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-2 border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary transition-all text-xs font-medium cursor-pointer shrink-0"
+                  >
+                    <Download className="size-3.5" />
+                    <span>Download Recording</span>
+                  </Button>
+                </div>
+
+                {/* Hidden Native Audio Element */}
+                <audio
+                  ref={audioRef}
+                  src={audioData.url}
+                  onTimeUpdate={() => {
+                    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+                  }}
+                  onEnded={() => setIsPlaying(false)}
+                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  preload="metadata"
+                />
+
+                {/* Interactive Player Controls */}
+                <div className="space-y-3 pt-1">
+                  {/* Scrubber & Time */}
+                  <div className="space-y-1.5">
+                    <div className="relative flex items-center">
+                      <input
+                        type="range"
+                        min={0}
+                        max={audioData.duration || 1}
+                        step={0.1}
+                        value={currentTime}
+                        onChange={handleSeek}
+                        aria-label="Audio scrubber"
+                        className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-border/70 accent-primary focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground tabular-nums">
+                      <span>{formatAudioTime(currentTime)}</span>
+                      <span>{formatAudioTime(audioData.duration)}</span>
+                    </div>
+                  </div>
+
+                  {/* Transport Controls & Speed Selectors */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSkip(-5)}
+                        aria-label="Skip backward 5 seconds"
+                        className="size-8 rounded-lg border border-border/60 bg-background/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors cursor-pointer text-xs font-mono"
+                        title="Rewind 5s"
+                      >
+                        -5s
+                      </button>
+
+                      <Button
+                        type="button"
+                        onClick={togglePlayPause}
+                        size="sm"
+                        className="h-8 px-3.5 gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs cursor-pointer shadow-sm hover:bg-primary/90"
+                      >
+                        {isPlaying ? (
+                          <>
+                            <Pause className="size-3.5 fill-current" />
+                            <span>Pause</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="size-3.5 fill-current" />
+                            <span>Play</span>
+                          </>
+                        )}
+                      </Button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSkip(5)}
+                        aria-label="Skip forward 5 seconds"
+                        className="size-8 rounded-lg border border-border/60 bg-background/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors cursor-pointer text-xs font-mono"
+                        title="Fast Forward 5s"
+                      >
+                        +5s
+                      </button>
+                    </div>
+
+                    {/* Playback Speed Buttons */}
+                    <div className="flex items-center gap-1 bg-background/70 border border-border/60 p-0.5 rounded-lg text-[11px] font-mono">
+                      {[1.0, 1.25, 1.5, 2.0].map((rate) => (
+                        <button
+                          key={rate}
+                          type="button"
+                          onClick={() => changePlaybackRate(rate)}
+                          className={cn(
+                            "px-2 py-0.5 rounded-md transition-colors cursor-pointer",
+                            playbackRate === rate
+                              ? "bg-primary text-primary-foreground font-semibold"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 6. Full Audio Transcript */}
             <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/40 pb-4">
                 <div>

@@ -67,6 +67,7 @@ flowchart TD
 - **Direct Audio-to-Audio Streaming**: Utilizes Google's Gemini Live API (`gemini-3.1-flash-live-preview`) over bidirectional WebSockets, bypassing traditional 3-hop cascaded pipelines (STT $\rightarrow$ LLM $\rightarrow$ TTS) to achieve sub-350ms P95 turnaround.
 - **Low-Latency Audio Pipeline**: Captures 16kHz mono Int16 PCM via Web Audio API, resamples in real time, and schedules gapless 24kHz output buffers.
 - **Client-Side Barge-In Interruption**: Continuously monitors microphone RMS energy to instantly flush and cancel queued audio buffers when the candidate speaks.
+- **Zero-Cost Dual-Track Session Recording**: Mixes candidate microphone and AI voice in the native Web Audio DSP graph with 2s timeslice streaming, dynamic codec negotiation (`.m4a` / `.webm`), EBML duration patching (crbug/642012), and IndexedDB LRU 5-session caching.
 
 ### 2. 🗣️ Conversational Engine & Cadence Control
 - **Structured 2-Sentence Turn Formula**:
@@ -308,7 +309,7 @@ cd apps/frontend && bunx tsc --noEmit && bun run build
 ```text
 AI Technical Interviewer (Voice AI) | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API, WebSockets
 • Engineered a real-time voice technical screening platform with Gemini Live API (gemini-3.1-flash-live-preview) over WebSockets, achieving sub-350ms P95 turnaround latency without intermediate STT/TTS serialization.
-• Architected a Web Audio API streaming pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, and instantaneous client-side buffer drainage on candidate barge-in interruptions.
+• Architected a Web Audio API streaming pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, dual-track C++ graph session recording (.webm/.m4a) with EBML duration patching, and client-side barge-in buffer drainage.
 • Implemented a stateful conversational engine with structured 2-sentence turn cadence, adaptive depth-to-breadth probing, ASR phonetic normalization ("post grass" -> PostgreSQL), and thinking-pause detection.
 • Built a GitHub ingestion service with URL auto-detection, 10-minute TTL LRU caching, and sandboxed README context extraction across 8 specialized domain tracks.
 • Developed an automated evaluation service enforcing technical accuracy thresholds, evidence-grounded scoring from verbatim quotes, candidate Q&A isolation, and structured JSON rubric generation.

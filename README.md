@@ -303,6 +303,7 @@ For exhaustive implementation details, state machines, and operational runbooks,
 | [**08. API & WebSocket Reference**](docs/08_API_REFERENCE.md) | Complete reference for REST endpoints, schemas, real-time WebSocket protocol frames, and SDK integration examples. |
 | [**09. Benchmarks & Evaluation Metrics**](docs/09_BENCHMARKS_AND_EVALUATIONS.md) | Latency budgets (P50/P95), Web Audio benchmarks, barge-in performance, and hiring evaluation calibration. |
 | [**10. Architecture & Data Flow Diagrams**](docs/10_ARCHITECTURE_AND_DATA_FLOW_DIAGRAMS.md) | Master reference with 40 architectural diagrams, step-by-step traces, DSP math, and interview defense cheat sheet. |
+| [**11. Interview Questions & Staff Defense**](docs/11_INTERVIEW_QUESTIONS_AND_STAFF_DEFENSE_COMPENDIUM.md) | Complete question bank (Fresher to Staff) covering React, Web Audio DSP, WebSockets, Prisma, AI Rubrics, and 100k-concurrency System Design. |
 
 ---
 

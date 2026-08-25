@@ -302,6 +302,7 @@ For exhaustive implementation details, state machines, and operational runbooks,
 | [**07. Troubleshooting & Runbook**](docs/07_TROUBLESHOOTING_RUNBOOK.md) | Diagnostic runbooks for common failures, local test scripts, and operational recovery commands. |
 | [**08. API & WebSocket Reference**](docs/08_API_REFERENCE.md) | Complete reference for REST endpoints, schemas, real-time WebSocket protocol frames, and SDK integration examples. |
 | [**09. Benchmarks & Evaluation Metrics**](docs/09_BENCHMARKS_AND_EVALUATIONS.md) | Latency budgets (P50/P95), Web Audio benchmarks, barge-in performance, and hiring evaluation calibration. |
+| [**10. Architecture & Data Flow Diagrams**](docs/10_ARCHITECTURE_AND_DATA_FLOW_DIAGRAMS.md) | Master reference with 40 architectural diagrams, step-by-step traces, DSP math, and interview defense cheat sheet. |
 
 ---
 

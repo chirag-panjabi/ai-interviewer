@@ -103,7 +103,7 @@ interviewRouter.post("/parse-resume", async (req, res) => {
       text,
       customApiKey,
     });
-    res.json(parsed);
+    res.json({ success: true, data: parsed, ...parsed });
   } catch (err: any) {
     console.error("[ParseResume] Error parsing resume:", err?.message || err);
     res.status(500).json({

@@ -1,4 +1,3 @@
-import axios from "axios";
 import { config } from "../config";
 import { type ParsedResume, ParsedResumeSchema } from "../types";
 
@@ -108,6 +107,7 @@ export async function parseResume(input: ParseResumeInput): Promise<ParsedResume
   }
 
   const candidateModels = [
+    "gemini-3.6-flash",
     config.GEMINI_EVAL_MODEL || "gemini-flash-latest",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
@@ -121,22 +121,31 @@ export async function parseResume(input: ParseResumeInput): Promise<ParsedResume
 
     try {
       console.log(`[ResumeParser] Parsing resume with model: ${modelName}...`);
-      const res = await axios.post(
-        url,
-        {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           contents: [{ role: "user", parts }],
           generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.1,
           },
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          timeout: 25000,
-        }
-      );
+        }),
+        signal: controller.signal,
+      });
 
-      const rawText = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errJson: any = await response.json().catch(() => null);
+        throw new Error(errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`);
+      }
+
+      const resData: any = await response.json();
+      const rawText = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) {
         throw new Error(`Empty response from ${modelName}`);
       }
@@ -157,7 +166,7 @@ export async function parseResume(input: ParseResumeInput): Promise<ParsedResume
       return validated;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[ResumeParser] ${modelName} failed: ${err?.response?.data?.error?.message || err.message}`);
+      console.warn(`[ResumeParser] ${modelName} failed: ${err.message}`);
     }
   }
 

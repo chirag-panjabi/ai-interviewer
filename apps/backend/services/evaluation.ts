@@ -82,13 +82,13 @@ export async function calculateResult(
     resumeMetadata,
   });
 
-  // Candidate models in order of priority: gemini-flash-latest -> gemini-3.5-flash-lite -> fallbacks
+  // Candidate models in order of priority: gemini-3.6-flash -> gemini-flash-latest -> fallbacks
   const candidateModels = [
+    "gemini-3.6-flash",
     config.GEMINI_EVAL_MODEL || "gemini-flash-latest",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.1-flash-lite",
-    "gemini-3.6-flash",
   ];
 
   let lastError: any = null;

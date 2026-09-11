@@ -67,9 +67,8 @@ export function ResumeUploader({
       });
       reader.readAsDataURL(file);
       const base64Data = await base64Promise;
-
       const customKey = getCustomApiKey();
-      const res = await axios.post<{ success: boolean; data: ParsedResume }>(
+      const res = await axios.post<any>(
         `${BACKEND_URL}/api/v1/parse-resume`,
         { pdfBase64: base64Data },
         {
@@ -78,11 +77,13 @@ export function ResumeUploader({
         }
       );
 
-      if (res.data?.success && res.data.data) {
-        onResumeParsed(res.data.data);
-        toast.success(`Resume parsed for ${res.data.data.candidateName || "Candidate"}!`);
+      const parsedData: ParsedResume = res.data?.data || (res.data?.candidateName ? res.data : null);
+
+      if (parsedData && parsedData.candidateName) {
+        onResumeParsed(parsedData);
+        toast.success(`Resume parsed for ${parsedData.candidateName || "Candidate"}!`);
       } else {
-        throw new Error("Failed to parse resume content.");
+        throw new Error(res.data?.message || "Failed to extract structured data from resume.");
       }
     } catch (err: any) {
       console.error("[ResumeUploader] PDF parsing failed:", err);
@@ -108,7 +109,7 @@ export function ResumeUploader({
     setIsParsing(true);
     try {
       const customKey = getCustomApiKey();
-      const res = await axios.post<{ success: boolean; data: ParsedResume }>(
+      const res = await axios.post<any>(
         `${BACKEND_URL}/api/v1/parse-resume`,
         { text: pastedText.trim() },
         {
@@ -117,11 +118,13 @@ export function ResumeUploader({
         }
       );
 
-      if (res.data?.success && res.data.data) {
-        onResumeParsed(res.data.data);
-        toast.success(`Resume parsed for ${res.data.data.candidateName || "Candidate"}!`);
+      const parsedData: ParsedResume = res.data?.data || (res.data?.candidateName ? res.data : null);
+
+      if (parsedData && parsedData.candidateName) {
+        onResumeParsed(parsedData);
+        toast.success(`Resume parsed for ${parsedData.candidateName || "Candidate"}!`);
       } else {
-        throw new Error("Failed to parse resume text.");
+        throw new Error(res.data?.message || "Failed to extract structured data from resume text.");
       }
     } catch (err: any) {
       console.error("[ResumeUploader] Text parsing failed:", err);

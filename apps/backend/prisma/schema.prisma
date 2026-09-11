@@ -11,16 +11,18 @@ datasource db {
 }
 
 model Interview {
-  id                String          @id @default(uuid())
-  githubMetadata    Json
-  experienceLevel   ExperienceLevel @default(MID)
-  track             InterviewTrack  @default(FULLSTACK_GENERAL)
-  status            InterviewStatus @default(CREATED)
-  score             Int             @default(0)
-  conversations     Message[]
-  feedback          String?
-  evaluationData    Json?
-  createdAt         DateTime        @default(now())
+  id                    String          @id @default(uuid())
+  githubMetadata        Json?
+  resumeMetadata        Json?
+  selectedResumeProject String?
+  experienceLevel       ExperienceLevel @default(MID)
+  track                 InterviewTrack  @default(FULLSTACK_GENERAL)
+  status                InterviewStatus @default(CREATED)
+  score                 Int             @default(0)
+  conversations         Message[]
+  feedback              String?
+  evaluationData        Json?
+  createdAt             DateTime        @default(now())
 
   @@index([status])
   @@index([createdAt])

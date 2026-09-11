@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Asynchronous Evaluation Roundtrip",
+    "output": "diagrams/async-roundtrip.html",
+    "viewBox": [820, 920],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "accept-and-ack",
+        "label": "Fast Initial Ack",
+        "focus": ["caller", "web", "api", "queue"],
+        "note": "The API acknowledges session termination quickly after durable job enqueue."
+      },
+      {
+        "id": "background-and-retry",
+        "label": "Background Work & Retry",
+        "focus": ["queue", "llm", "db"],
+        "note": "LLM timeouts trigger background retry and deterministic regex fallback without blocking the client."
+      },
+      {
+        "id": "observe-consistency",
+        "label": "Observe Final Consistency",
+        "focus": ["queue", "ws", "web", "api", "db", "caller"],
+        "note": "Dual observation paths (WebSocket push and REST polling) reconcile on PostgreSQL ground truth."
+      }
+    ]
+  },
+  "participants": [
+    { "id": "caller", "type": "external", "label": "Candidate", "sublabel": "browser" },
+    { "id": "web", "type": "frontend", "label": "React App", "sublabel": "Result UI" },
+    { "id": "api", "type": "backend", "label": "Express API", "sublabel": "gateway" },
+    { "id": "queue", "type": "messagebus", "label": "Eval Queue", "sublabel": "async worker" },
+    { "id": "llm", "type": "cloud", "label": "Gemini Flash", "sublabel": "rubric model" },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "dossier store" },
+    { "id": "ws", "type": "messagebus", "label": "Live Socket", "sublabel": "push event" }
+  ],
+  "segments": [
+    { "from": 150, "to": 325, "label": "Accept & Fast Ack" },
+    { "from": 340, "to": 550, "label": "Background Processing & Retry Fallback" },
+    { "from": 565, "to": 850, "label": "Notification & Observable Consistency" }
+  ],
+  "messages": [
+    { "id": "finish-click", "from": "caller", "to": "web", "y": 180, "label": "finish interview", "variant": "default" },
+    { "id": "post-finish", "from": "web", "to": "api", "y": 222, "label": "POST /evaluate/:id", "variant": "emphasis" },
+    { "id": "enqueue-job", "from": "api", "to": "queue", "y": 264, "label": "enqueue eval job", "variant": "emphasis" },
+    { "id": "ack-202", "from": "api", "to": "web", "y": 306, "label": "202 Evaluating", "variant": "return" },
+    { "id": "grade-rubrics", "from": "queue", "to": "llm", "y": 358, "label": "grade 5 rubrics", "variant": "default" },
+    { "id": "timeout-err", "from": "llm", "to": "queue", "y": 400, "label": "timeout / 429 limit", "variant": "return" },
+    { "id": "retry-fallback", "from": "queue", "to": "llm", "y": 442, "label": "retry + regex fallback", "variant": "dashed" },
+    { "id": "scorecard-ok", "from": "llm", "to": "queue", "y": 484, "label": "scorecard JSON", "variant": "return" },
+    { "id": "persist-dossier", "from": "queue", "to": "db", "y": 526, "label": "save final dossier", "variant": "emphasis" },
+    { "id": "emit-completed", "from": "queue", "to": "ws", "y": 578, "label": "eval.completed", "variant": "dashed" },
+    { "id": "push-signal", "from": "ws", "to": "web", "y": 620, "label": "push ready signal", "variant": "dashed" },
+    { "id": "poll-result", "from": "web", "to": "api", "y": 662, "label": "GET /result/:id (poll)", "variant": "default" },
+    { "id": "read-dossier", "from": "api", "to": "db", "y": 704, "label": "read dossier", "variant": "default" },
+    { "id": "db-completed", "from": "db", "to": "api", "y": 746, "label": "status: COMPLETED", "variant": "return" },
+    { "id": "res-scorecard", "from": "api", "to": "web", "y": 788, "label": "200 final scorecard", "variant": "return" },
+    { "id": "render-scorecard", "from": "web", "to": "caller", "y": 830, "label": "render report", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "web", "from": 175, "to": 312, "type": "frontend" },
+    { "participant": "api", "from": 216, "to": 312, "type": "backend" },
+    { "participant": "queue", "from": 258, "to": 584, "type": "messagebus" },
+    { "participant": "llm", "from": 352, "to": 490, "type": "cloud" },
+    { "participant": "db", "from": 520, "to": 752, "type": "database" },
+    { "participant": "ws", "from": 572, "to": 626, "type": "messagebus" },
+    { "participant": "web", "from": 614, "to": 836, "type": "frontend" },
+    { "participant": "api", "from": 656, "to": 794, "type": "backend" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Fast Initial Ack",
+      "items": [
+        "Candidate finishes interview; Express gateway enqueues evaluation and returns HTTP 202",
+        "Client does not block on LLM grading latency; transitions immediately to loading state"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Retry & Fallback Guard",
+      "items": [
+        "Upstream Gemini timeouts or 429 quota limits trigger bounded retries in the background worker",
+        "Deterministic heuristic regex fallback guarantees candidate dossier persistence in PostgreSQL"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Observable Consistency",
+      "items": [
+        "WebSocket pushes eval.completed while HTTP GET /result/:id provides reliable polling",
+        "Both notification paths reconcile on PostgreSQL ground truth, rendering final scorecard"
+      ]
+    }
+  ]
+}

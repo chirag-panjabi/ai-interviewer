@@ -2,6 +2,7 @@ import { Router } from "express";
 import axios from "axios";
 import { PreInterviewBody } from "../types";
 import { scrapeGithub, getGithubReposPreview } from "../services/github";
+import { parseResume } from "../services/resumeParser";
 import { prisma } from "../db";
 import { calculateResult } from "../services/evaluation";
 import { interviewCreationLimiter } from "../middleware/rateLimiter";
@@ -86,7 +87,32 @@ interviewRouter.post("/github-preview", async (req, res) => {
   }
 });
 
-// 2. Ingest GitHub profile and initialize interview (Rate limited to configurable daily limit per IP)
+// 3. Parse candidate resume (PDF base64 or raw text) via Gemini Multimodal
+interviewRouter.post("/parse-resume", async (req, res) => {
+  const { pdfBase64, text } = req.body;
+  if (!pdfBase64 && (!text || !text.trim())) {
+    res.status(400).json({ message: "Either a PDF file or text content is required." });
+    return;
+  }
+
+  const customApiKey = (req.headers["x-gemini-api-key"] || req.headers["x-api-key"]) as string | undefined;
+
+  try {
+    const parsed = await parseResume({
+      pdfBase64,
+      text,
+      customApiKey,
+    });
+    res.json(parsed);
+  } catch (err: any) {
+    console.error("[ParseResume] Error parsing resume:", err?.message || err);
+    res.status(500).json({
+      message: err?.message || "Failed to parse resume with Gemini.",
+    });
+  }
+});
+
+// 4. Ingest Candidate Context (Resume, GitHub, or both) and initialize interview
 interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
   const result = PreInterviewBody.safeParse(req.body);
 
@@ -101,11 +127,16 @@ interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res
   const data = result.data;
 
   try {
-    const githubData = await scrapeGithub(data.github, data.selectedRepo);
+    let githubData: any = null;
+    if (data.github && data.github.trim() && data.github.trim().toLowerCase() !== "candidate") {
+      githubData = await scrapeGithub(data.github, data.selectedRepo);
+    }
 
     const interview = await prisma.interview.create({
       data: {
-        githubMetadata: JSON.stringify(githubData),
+        githubMetadata: githubData ? JSON.stringify(githubData) : undefined,
+        resumeMetadata: data.resumeMetadata ? JSON.stringify(data.resumeMetadata) : undefined,
+        selectedResumeProject: data.selectedResumeProject || null,
         experienceLevel: data.experienceLevel,
         track: data.track as any,
         status: "CREATED",
@@ -201,7 +232,8 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       interview.githubMetadata,
       interview.experienceLevel,
       interview.track,
-      customApiKey
+      customApiKey,
+      interview.resumeMetadata
     );
 
     // Save final structured evaluation

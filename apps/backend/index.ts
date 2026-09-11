@@ -24,8 +24,9 @@ app.use(
   })
 );
 
-// Middleware
-app.use(express.json({ limit: "2mb" }));
+// Middleware (Support up to 15MB payloads for base64 PDF uploads)
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ limit: "15mb", extended: true }));
 app.use(
   cors({
     origin: (origin, callback) => {

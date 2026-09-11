@@ -1,0 +1,97 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Evaluation & 5-Model Fallback Pipeline",
+    "output": "diagrams/evaluation-fallback-pipeline.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy-path",
+        "label": "Session End to Scorecard",
+        "focus": ["end_session", "atomic_lock", "collate_turns", "cascade_loop", "primary_model", "zod_validate", "db_commit", "dossier_view"],
+        "note": "Follow candidate session end through transcript aggregation, grading, and dossier rendering."
+      },
+      {
+        "id": "cascade-fallback",
+        "label": "5-Model Fallback Loop",
+        "focus": ["cascade_loop", "primary_model", "fallback_models", "zod_validate"],
+        "note": "Automatic failover across Gemini models if primary model encounters quota or 503 errors."
+      },
+      {
+        "id": "edge-storage",
+        "label": "Local Audio Patching",
+        "focus": ["end_session", "patch_ebml"],
+        "note": "Client binary EBML duration patching and IndexedDB audio storage."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "ui", "label": "Client UI & Edge Storage" },
+    { "id": "gateway", "label": "API Gateway & Database" },
+    { "id": "eval_engine", "label": "Cascade Fallback Engine" },
+    { "id": "models", "label": "Google Gemini Models" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "Session Finalize & Lock", "fromCol": 0, "toCol": 1 },
+    { "id": "grading", "label": "Cascade Fallback Grading", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "deliver", "label": "Validation & Dossier Delivery", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "client_group", "label": "Edge finalization", "lane": "ui", "fromCol": 0, "toCol": 1 },
+    { "id": "cascade_group", "label": "Multi-model fallback", "lane": "eval_engine", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "models_group", "label": "Gemini inference", "lane": "models", "fromCol": 2, "toCol": 3 },
+    { "id": "commit_group", "label": "Commit & render", "lane": "gateway", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["end_session", "atomic_lock", "collate_turns", "cascade_loop", "primary_model", "zod_validate", "db_commit", "dossier_view"],
+  "nodes": [
+    { "id": "end_session", "lane": "ui", "col": 0, "type": "frontend", "label": "End Session", "sublabel": "User clicks end", "width": 132 },
+    { "id": "patch_ebml", "lane": "ui", "col": 1, "type": "database", "label": "Patch EBML", "sublabel": "Write to IndexedDB", "tag": "crbug fix", "width": 132 },
+    { "id": "atomic_lock", "lane": "gateway", "col": 1, "type": "security", "label": "Atomic Lock", "sublabel": "Status: EVALUATING", "tag": "prevent races", "width": 132 },
+    { "id": "collate_turns", "lane": "gateway", "col": 2, "type": "database", "label": "Load Transcript", "sublabel": "Ordered turns query", "width": 132 },
+    { "id": "cascade_loop", "lane": "eval_engine", "col": 2, "type": "backend", "label": "Cascade Loop", "sublabel": "Iterate models", "width": 132 },
+    { "id": "primary_model", "lane": "models", "col": 3, "type": "cloud", "label": "Primary Model", "sublabel": "gemini-flash-latest", "brand": "google-gemini", "width": 132 },
+    { "id": "fallback_models", "lane": "models", "col": 2, "type": "cloud", "label": "Fallback Models", "sublabel": "3.5-flash-lite / 2.5", "brand": "google-gemini", "width": 132 },
+    { "id": "zod_validate", "lane": "eval_engine", "col": 4, "type": "security", "label": "Zod Schema Guard", "sublabel": "Verify 4 pillars", "tag": "runtime check", "width": 132 },
+    { "id": "db_commit", "lane": "gateway", "col": 4, "type": "database", "label": "Postgres Commit", "sublabel": "Status: COMPLETED", "brand": "postgresql", "width": 132 },
+    { "id": "dossier_view", "lane": "ui", "col": 5, "type": "frontend", "label": "Dossier View", "sublabel": "Scorecard & audio", "brand": "react", "width": 140 }
+  ],
+  "edges": [
+    { "from": "end_session", "to": "patch_ebml", "label": "extract audio", "variant": "dashed" },
+    { "from": "end_session", "to": "atomic_lock", "label": "GET /result/:id", "variant": "emphasis" },
+    { "from": "atomic_lock", "to": "collate_turns", "label": "fetch turns" },
+    { "from": "collate_turns", "to": "cascade_loop", "label": "build prompt", "variant": "emphasis" },
+    { "from": "cascade_loop", "to": "primary_model", "label": "attempt grade", "variant": "emphasis" },
+    { "from": "primary_model", "to": "fallback_models", "label": "on 429/503 quota", "variant": "security" },
+    { "from": "fallback_models", "to": "zod_validate", "label": "fallback JSON", "variant": "dashed" },
+    { "from": "primary_model", "to": "zod_validate", "label": "raw JSON", "variant": "default" },
+    { "from": "zod_validate", "to": "db_commit", "label": "validated payload", "variant": "emphasis" },
+    { "from": "db_commit", "to": "dossier_view", "label": "render scorecard", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Edge Finalization",
+      "items": [
+        "EBML duration patcher fixes Chromium crbug.com/642012",
+        "Raw audio saved to IndexedDB with zero cloud storage costs"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "5-Model Fallback Cascade",
+      "items": [
+        "Iterates gemini-flash-latest down to gemini-3-flash-preview",
+        "Prevents evaluation failures during Google API regional outages"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Objective Tier-1 Grading",
+      "items": [
+        "Zod schema validates 4 competency pillars and verbatim quotes",
+        "Technical competency gating caps overall score at Lean No Hire if accuracy < 4.5"
+      ]
+    }
+  ]
+}

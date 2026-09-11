@@ -17,15 +17,39 @@ export interface EvaluationPromptParams {
   track: InterviewTrack;
   transcriptFormatted: string;
   githubMetadata?: any;
+  resumeMetadata?: any;
 }
 
 export function getEvaluationPrompt(params: EvaluationPromptParams): string {
-  const { experienceLevel, track, transcriptFormatted, githubMetadata } = params;
+  const { experienceLevel, track, transcriptFormatted, githubMetadata, resumeMetadata } = params;
 
   const trackDisplay = formatTrackName(track);
   const isBehavioral = track === "BEHAVIORAL";
   const isDSA = track === "DSA";
   const isFullMock = track === "FULL_MOCK_SCREEN";
+
+  let resumeContextFormatted = "No resume provided.";
+  if (resumeMetadata) {
+    try {
+      const rm = typeof resumeMetadata === "string" ? JSON.parse(resumeMetadata) : resumeMetadata;
+      resumeContextFormatted = `<untrusted_candidate_resume_context>
+Candidate Name: ${rm.candidateName || "Candidate"}
+Summary: ${rm.summary || "None"}
+Skills: ${(rm.skills || []).join(", ") || "None"}
+Projects:
+${(rm.projects || []).map((p: any) => `- ${p.name}: ${p.description || ""} (Tech: ${(p.techStack || []).join(", ") || "n/a"})${p.metrics ? ` [Claimed Metric: ${p.metrics}]` : ""}`).join("\n")}
+Work Experience:
+${(rm.workHistory || []).map((w: any) => `- ${w.role} at ${w.company} (${w.duration || ""}): ${(w.highlights || []).join("; ")}`).join("\n")}
+</untrusted_candidate_resume_context>`;
+    } catch {
+      resumeContextFormatted = `<untrusted_candidate_resume_context>\n${String(resumeMetadata)}\n</untrusted_candidate_resume_context>`;
+    }
+  }
+
+  let githubContextFormatted = "No public repository context provided.";
+  if (githubMetadata) {
+    githubContextFormatted = `<untrusted_candidate_github_context>\n${typeof githubMetadata === "string" ? githubMetadata : JSON.stringify(githubMetadata, null, 2)}\n</untrusted_candidate_github_context>`;
+  }
 
   return `You are a Principal Staff Software Engineer and Hiring Committee Chair at a top Tier-1 technology company (such as Stripe, Google, or Meta).
 You are conducting an objective, evidence-based, unapologetically rigorous technical interview evaluation.
@@ -34,7 +58,9 @@ You are conducting an objective, evidence-based, unapologetically rigorous techn
 - **Track**: ${trackDisplay} (${track})
 - **Declared Experience Level**: **${experienceLevel}** (${experienceLevel === "JUNIOR" ? "0-2 years" : experienceLevel === "SENIOR" ? "5+ years (Staff/Lead)" : "2-5 years (Mid-Level)"})
 - **Candidate GitHub Project Context**:
-${githubMetadata ? (typeof githubMetadata === "string" ? githubMetadata : JSON.stringify(githubMetadata, null, 2)) : "No public repository context provided."}
+${githubContextFormatted}
+- **Candidate Resume Context**:
+${resumeContextFormatted}
 
 ### FULL INTERVIEW TRANSCRIPT:
 ${transcriptFormatted}

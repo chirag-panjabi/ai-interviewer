@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Technical Interviewer - High-Level Architecture",
+    "output": "diagrams/high-level-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1100, 500],
+    "views": [
+      {
+        "id": "primary-voice-loop",
+        "label": "Primary Voice Loop",
+        "focus": ["client_ui", "audio_dsp", "ws_gateway", "gemini_live"],
+        "note": "Sub-second bidirectional conversational audio streaming loop between candidate and Gemini Live."
+      },
+      {
+        "id": "intake-and-context",
+        "label": "Candidate Intake & Setup",
+        "focus": ["client_ui", "api_router", "github_api", "postgres_db"],
+        "note": "Candidate onboarding, GitHub codebase scraping, rate limiting, and session creation."
+      },
+      {
+        "id": "evaluation-and-storage",
+        "label": "Evaluation & Persistence",
+        "focus": ["eval_engine", "gemini_flash", "postgres_db", "audio_store"],
+        "note": "Post-session 5-rubric grading cascade and dual-tier audio/dossier persistence."
+      }
+    ]
+  },
+  "components": [
+    { "id": "client_ui", "type": "frontend", "label": "React Client UI", "sublabel": "voice orb & controls", "brand": "react", "pos": [70, 80], "size": [150, 60] },
+    { "id": "audio_dsp", "type": "frontend", "label": "Web Audio DSP", "sublabel": "16kHz PCM downsampler", "pos": [70, 200], "size": [150, 60] },
+    { "id": "audio_store", "type": "database", "label": "IndexedDB Storage", "sublabel": "EBML patched WebM", "pos": [70, 320], "size": [150, 60] },
+    { "id": "api_router", "type": "security", "label": "Express API Gateway", "sublabel": "rate limiting & intake", "pos": [340, 80], "size": [160, 60] },
+    { "id": "ws_gateway", "type": "backend", "label": "Gemini Live Proxy", "sublabel": "bidi streaming & 30s grace", "pos": [340, 200], "size": [160, 60] },
+    { "id": "eval_engine", "type": "backend", "label": "Evaluation Engine", "sublabel": "5-rubric grading & fallback", "pos": [340, 360], "size": [160, 60] },
+    { "id": "postgres_db", "type": "database", "label": "PostgreSQL DB", "sublabel": "Prisma turn persistence", "brand": "postgresql", "pos": [610, 270], "size": [150, 60] },
+    { "id": "github_api", "type": "external", "label": "GitHub API", "sublabel": "repository code context", "brand": "github", "pos": [880, 80], "size": [160, 60] },
+    { "id": "gemini_live", "type": "cloud", "label": "Gemini Live API", "sublabel": "sub-second voice model", "brand": "google-gemini", "pos": [880, 200], "size": [160, 60] },
+    { "id": "gemini_flash", "type": "cloud", "label": "Gemini Flash API", "sublabel": "structured JSON scoring", "brand": "google-gemini", "pos": [880, 360], "size": [160, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Candidate Browser Environment (Untrusted Client)", "wraps": ["client_ui", "audio_dsp", "audio_store"] },
+    { "kind": "security-group", "label": "Application Gateway & Backend (Trusted Runtime)", "wraps": ["api_router", "ws_gateway", "eval_engine"] },
+    { "kind": "security-group", "label": "Persistence Tier (PostgreSQL)", "wraps": ["postgres_db"] },
+    { "kind": "region", "label": "External Managed Services (Cloud APIs)", "wraps": ["github_api", "gemini_live", "gemini_flash"] }
+  ],
+  "connections": [
+    { "id": "ui-to-api", "from": "client_ui", "to": "api_router", "label": "REST intake", "fromSide": "right", "toSide": "left" },
+    { "id": "api-to-gh", "from": "api_router", "to": "github_api", "label": "repo context", "fromSide": "right", "toSide": "left" },
+    { "id": "ui-to-dsp", "from": "client_ui", "to": "audio_dsp", "label": "mic start", "labelAt": [145, 170], "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "id": "dsp-to-ws", "from": "audio_dsp", "to": "ws_gateway", "label": "16kHz PCM (WSS)", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "ws-to-gemini", "from": "ws_gateway", "to": "gemini_live", "label": "bidi audio stream", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "ws-to-db", "from": "ws_gateway", "to": "postgres_db", "label": "persist turns", "fromSide": "bottom", "toSide": "left" },
+    { "id": "eval-to-gemini", "from": "eval_engine", "to": "gemini_flash", "label": "rubric scoring", "fromSide": "right", "toSide": "left" },
+    { "id": "eval-to-db", "from": "eval_engine", "to": "postgres_db", "label": "save dossier", "fromSide": "top", "toSide": "bottom" },
+    { "id": "dsp-to-store", "from": "audio_dsp", "to": "audio_store", "label": "store WebM", "labelAt": [145, 290], "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary Voice Path",
+      "items": [
+        "AudioWorklet downsamples candidate mic to 16kHz mono PCM for minimal uplink overhead",
+        "Full-duplex WebSocket gateway streams to Gemini Live with sub-800ms response time",
+        "Server-side VAD barge-in halts model playback immediately when candidate speaks"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Trust & Security Boundaries",
+      "items": [
+        "Untrusted client execution boundary: zero Gemini API keys or database credentials in browser",
+        "Express API gateway enforces IP rate limiting and validates candidate GitHub inputs",
+        "In-memory 30s disconnect grace window preserves active Gemini socket across Wi-Fi blips"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Data Persistence & Resilience",
+      "items": [
+        "FIFO Promise queue guarantees strictly ordered message turn commits into PostgreSQL",
+        "Post-interview evaluation engine cascades across 5 rubrics with regex fallback",
+        "Complete interview audio saved in client IndexedDB with EBML header patching"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Interview Request Lifecycle - Caller to Response",
+    "output": "diagrams/request-flow.html",
+    "viewBox": [820, 760],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "request-and-auth",
+        "label": "Request & Identity",
+        "focus": ["caller", "web", "api", "auth"],
+        "note": "Initial candidate intake payload validated against IP rate limits and API key authenticity."
+      },
+      {
+        "id": "cache-and-persistence",
+        "label": "Cache & Persistence Fallback",
+        "focus": ["api", "cache", "db"],
+        "note": "In-memory profile cache miss triggers PostgreSQL persistence fallback to commit ground-truth session."
+      },
+      {
+        "id": "trace-and-response",
+        "label": "Async Trace & Final Response",
+        "focus": ["api", "cache", "trace", "web", "caller"],
+        "note": "Non-blocking pre-warm event emitted to Event Bus while returning 201 Created to caller."
+      }
+    ]
+  },
+  "participants": [
+    { "id": "caller", "type": "external", "label": "Candidate", "sublabel": "browser session" },
+    { "id": "web", "type": "frontend", "label": "React App", "sublabel": "Form UI" },
+    { "id": "api", "type": "backend", "label": "Express API", "sublabel": "gateway" },
+    { "id": "auth", "type": "security", "label": "Auth Guard", "sublabel": "rate limit & BYOK" },
+    { "id": "cache", "type": "database", "label": "MemCache", "sublabel": "10m profile TTL" },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "Prisma session" },
+    { "id": "trace", "type": "messagebus", "label": "Event Bus", "sublabel": "async pre-warm" }
+  ],
+  "segments": [
+    { "from": 150, "to": 295, "label": "Intake & Auth" },
+    { "from": 315, "to": 505, "label": "Cache Miss & Persistence Fallback" },
+    { "from": 525, "to": 665, "label": "Async Trace & Final Response" }
+  ],
+  "messages": [
+    { "id": "start-intake", "from": "caller", "to": "web", "y": 185, "label": "start interview", "variant": "default" },
+    { "id": "post-session", "from": "web", "to": "api", "y": 228, "label": "POST /pre-interview", "variant": "emphasis" },
+    { "id": "verify-identity", "from": "api", "to": "auth", "y": 270, "label": "verify key & rate limit", "variant": "security" },
+    { "id": "auth-success", "from": "auth", "to": "api", "y": 305, "label": "authorized", "variant": "return" },
+    { "id": "cache-read", "from": "api", "to": "cache", "y": 354, "label": "lookup profile", "variant": "default" },
+    { "id": "cache-miss", "from": "cache", "to": "api", "y": 391, "label": "cache miss", "variant": "return" },
+    { "id": "db-persist", "from": "api", "to": "db", "y": 443, "label": "persist session record", "variant": "emphasis" },
+    { "id": "db-ack", "from": "db", "to": "api", "y": 489, "label": "session created", "variant": "return" },
+    { "id": "cache-write", "from": "api", "to": "cache", "y": 536, "label": "write-through cache", "variant": "dashed" },
+    { "id": "trace-emit", "from": "api", "to": "trace", "y": 580, "label": "emit pre-warm event", "variant": "dashed" },
+    { "id": "api-res", "from": "api", "to": "web", "y": 625, "label": "201 Created { id }", "variant": "return" },
+    { "id": "ui-render", "from": "web", "to": "caller", "y": 662, "label": "render voice room", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "web", "from": 220, "to": 668, "type": "frontend" },
+    { "participant": "api", "from": 228, "to": 632, "type": "backend" },
+    { "participant": "auth", "from": 265, "to": 310, "type": "security" },
+    { "participant": "cache", "from": 349, "to": 398, "type": "database" },
+    { "participant": "db", "from": 438, "to": 496, "type": "database" },
+    { "participant": "trace", "from": 575, "to": 630, "type": "messagebus" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Primary Request Flow",
+      "items": [
+        "Candidate initiates interview via Form.tsx, sending POST /pre-interview with GitHub context",
+        "Express router returns 201 Created with interview ID after persisting session state"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Auth Guard & Cache Fallback",
+      "items": [
+        "Auth middleware validates Google Gemini API key and enforces IP rate limiting",
+        "Cache miss on candidate profile falls back to PostgreSQL Prisma store for durable persistence"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Async Trace & Decoupling",
+      "items": [
+        "Pre-warm trace emitted asynchronously to background Event Bus without delaying caller",
+        "Background worker initializes promptBuilder and preheats Gemini Live WebSocket session"
+      ]
+    }
+  ]
+}

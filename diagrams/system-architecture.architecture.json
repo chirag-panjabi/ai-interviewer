@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Technical Interviewer - System Architecture",
+    "output": "diagrams/system-architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "live-voice-stream",
+        "label": "Live Voice Streaming",
+        "focus": ["candidate", "audio_dsp", "live_proxy", "gemini_live", "db"],
+        "note": "Sub-second bidirectional audio loop connecting candidate mic to Gemini Live."
+      },
+      {
+        "id": "intake-and-context",
+        "label": "Candidate Intake & Context",
+        "focus": ["candidate", "client_ui", "gateway", "github"],
+        "note": "Pre-interview GitHub profile scraping, rate limiting, and session creation."
+      },
+      {
+        "id": "evaluation-pipeline",
+        "label": "Evaluation & Scoring",
+        "focus": ["eval_service", "gemini_eval", "db"],
+        "note": "Post-session multi-model cascade evaluation against Tier-1 rubrics."
+      }
+    ]
+  },
+  "components": [
+    { "id": "candidate", "type": "external", "label": "Candidate", "sublabel": "Browser / Mic", "pos": [40, 210], "size": [130, 60] },
+    { "id": "client_ui", "type": "frontend", "label": "React 19 App", "sublabel": "UI & State Machine", "brand": "react", "pos": [250, 90], "size": [140, 60] },
+    { "id": "audio_dsp", "type": "frontend", "label": "Web Audio Engine", "sublabel": "16kHz Resampler & Player", "pos": [250, 210], "size": [140, 60] },
+    { "id": "client_storage", "type": "database", "label": "Browser IndexedDB", "sublabel": "Local WebM Storage", "pos": [250, 330], "size": [140, 60] },
+    { "id": "gateway", "type": "security", "label": "API Gateway", "sublabel": "Express 5 + Rate Limiter", "pos": [490, 90], "size": [150, 60] },
+    { "id": "live_proxy", "type": "backend", "label": "Gemini Live Hub", "sublabel": "Bidi Streaming & 30s Grace", "pos": [490, 210], "size": [150, 60] },
+    { "id": "eval_service", "type": "backend", "label": "Evaluation Engine", "sublabel": "5-Model Fallback Grading", "pos": [490, 420], "size": [150, 60] },
+    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "Prisma Connection Pool", "brand": "postgresql", "pos": [720, 315], "size": [140, 60] },
+    { "id": "github", "type": "cloud", "label": "GitHub API", "sublabel": "Repo Context & Stars", "brand": "github", "pos": [880, 90], "size": [140, 60] },
+    { "id": "gemini_live", "type": "cloud", "label": "Gemini Live API", "sublabel": "Flash Live WebSocket", "brand": "google-gemini", "pos": [880, 210], "size": [140, 60] },
+    { "id": "gemini_eval", "type": "cloud", "label": "Gemini Flash", "sublabel": "Structured Rubric REST", "brand": "google-gemini", "pos": [880, 420], "size": [140, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Browser Client Environment", "wraps": ["candidate", "client_ui", "audio_dsp", "client_storage"] },
+    { "kind": "security-group", "label": "Backend Application Services", "wraps": ["gateway", "live_proxy", "eval_service", "db"] },
+    { "kind": "region", "label": "External Cloud Services", "wraps": ["github", "gemini_live", "gemini_eval"] }
+  ],
+  "connections": [
+    { "id": "user-to-ui", "from": "candidate", "to": "client_ui", "label": "configure", "fromSide": "top", "toSide": "left" },
+    { "id": "mic-to-dsp", "from": "candidate", "to": "audio_dsp", "label": "mic audio", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "ui-to-gateway", "from": "client_ui", "to": "gateway", "label": "REST intake", "fromSide": "right", "toSide": "left" },
+    { "id": "dsp-to-proxy", "from": "audio_dsp", "to": "live_proxy", "label": "WSS /live/:id", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "dsp-to-storage", "from": "audio_dsp", "to": "client_storage", "label": "record WebM", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "gateway-to-gh", "from": "gateway", "to": "github", "label": "scrape repos", "fromSide": "right", "toSide": "left" },
+    { "id": "proxy-to-live", "from": "live_proxy", "to": "gemini_live", "label": "bidi PCM audio", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "proxy-to-db", "from": "live_proxy", "to": "db", "label": "persist turns", "fromSide": "right", "toSide": "top" },
+    { "id": "eval-to-gemini", "from": "eval_service", "to": "gemini_eval", "label": "grade rubric", "fromSide": "right", "toSide": "left" },
+    { "id": "eval-to-db", "from": "eval_service", "to": "db", "label": "save scorecard", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Client DSP & Storage",
+      "items": [
+        "16kHz mono linear downsampling with monotonic Web Audio clock",
+        "Complete session WebM recordings stored in client IndexedDB"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Real-Time Gateway",
+      "items": [
+        "Full-duplex WebSocket hub with 30s disconnect grace period",
+        "In-process FIFO Promise queue for strict causal Postgres ordering"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "AI Foundation Models",
+      "items": [
+        "Gemini 3.1 Flash Live with server-side VAD barge-in",
+        "5-model cascade fallback loop guaranteeing zero grading failure"
+      ]
+    }
+  ]
+}

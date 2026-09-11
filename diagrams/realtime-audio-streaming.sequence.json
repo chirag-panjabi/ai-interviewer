@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Real-Time Audio Streaming & Barge-In Sequence",
+    "output": "diagrams/realtime-audio-streaming.html",
+    "quality_profile": "showcase",
+    "viewBox": [820, 620],
+    "views": [
+      {
+        "id": "handshake-path",
+        "label": "WebSocket Handshake",
+        "focus": ["candidate", "audioweb", "gateway", "live_hub", "gemini"],
+        "note": "Client mic unlock, HTTP upgrade to WebSocket, and upstream Gemini handshake."
+      },
+      {
+        "id": "bidi-streaming",
+        "label": "Full-Duplex Audio & Barge-In",
+        "focus": ["audioweb", "live_hub", "gemini"],
+        "note": "16kHz downsampling, continuous streaming, and server-side VAD interruption."
+      },
+      {
+        "id": "teardown-persistence",
+        "label": "FIFO Database Persistence",
+        "focus": ["live_hub", "postgres"],
+        "note": "Serialized Promise queue ensures strictly ordered message insertion in PostgreSQL."
+      }
+    ]
+  },
+  "participants": [
+    { "id": "candidate", "type": "external", "label": "Candidate", "sublabel": "mic / speaker" },
+    { "id": "audioweb", "type": "frontend", "label": "Web Audio", "sublabel": "DSP engine" },
+    { "id": "gateway", "type": "security", "label": "Gateway", "sublabel": "Express 5 ws" },
+    { "id": "live_hub", "type": "backend", "label": "Live Hub", "sublabel": "geminiLive.ts" },
+    { "id": "gemini", "type": "cloud", "label": "Gemini", "sublabel": "Flash WebSocket", "brand": "google-gemini" },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "Prisma store" }
+  ],
+  "segments": [
+    { "from": 145, "to": 255, "label": "Session Handshake" },
+    { "from": 265, "to": 480, "label": "Full-Duplex Voice & Barge-In Interruption" },
+    { "from": 490, "to": 540, "label": "Session Teardown & FIFO Persistence" }
+  ],
+  "messages": [
+    { "from": "candidate", "to": "audioweb", "y": 160, "label": "start session", "variant": "default" },
+    { "from": "audioweb", "to": "gateway", "y": 188, "label": "HTTP Upgrade -> WSS", "variant": "emphasis" },
+    { "from": "gateway", "to": "live_hub", "y": 216, "label": "attachClient(socket)", "variant": "default" },
+    { "from": "live_hub", "to": "gemini", "y": 244, "label": "BidiGenerateContent", "variant": "emphasis" },
+    { "from": "gemini", "to": "live_hub", "y": 272, "label": "setupComplete", "variant": "return" },
+    { "from": "live_hub", "to": "audioweb", "y": 300, "label": "{ type: 'ready' }", "variant": "return" },
+    { "from": "audioweb", "to": "live_hub", "y": 328, "label": "16kHz PCM chunks", "variant": "emphasis" },
+    { "from": "live_hub", "to": "gemini", "y": 356, "label": "realtimeInput (16k)", "variant": "emphasis" },
+    { "from": "gemini", "to": "live_hub", "y": 384, "label": "serverContent (24k)", "variant": "return" },
+    { "from": "audioweb", "to": "live_hub", "y": 412, "label": "candidate speaks (barge-in)", "variant": "security" },
+    { "from": "gemini", "to": "live_hub", "y": 440, "label": "interrupted = true", "variant": "security" },
+    { "from": "live_hub", "to": "audioweb", "y": 468, "label": "{ type: 'interrupt' } (flush)", "variant": "security" },
+    { "from": "live_hub", "to": "postgres", "y": 496, "label": "queueDbWrite(turn)", "variant": "dashed" },
+    { "from": "live_hub", "to": "postgres", "y": 524, "label": "status: 'EVALUATING'", "variant": "emphasis" }
+  ],
+  "activations": [
+    { "participant": "audioweb", "from": 155, "to": 535, "type": "frontend" },
+    { "participant": "gateway", "from": 180, "to": 225, "type": "security" },
+    { "participant": "live_hub", "from": 210, "to": 535, "type": "backend" },
+    { "participant": "gemini", "from": 238, "to": 450, "type": "cloud" },
+    { "participant": "postgres", "from": 490, "to": 535, "type": "database" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Low-Latency DSP",
+      "items": [
+        "16kHz linear downsampling with monotonic timeline scheduling",
+        "Sub-second response time with jitter-free browser audio buffer"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Barge-In Interruption",
+      "items": [
+        "Server-side VAD cancels generation immediately when user speaks",
+        "Frontend flushes scheduled AudioBufferSourceNodes on interrupt"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "FIFO Database Queue",
+      "items": [
+        "Serialized Promise chain guarantees causal turn persistence",
+        "Zero race conditions between simultaneous dialogue turns"
+      ]
+    }
+  ]
+}

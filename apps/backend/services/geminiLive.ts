@@ -186,6 +186,26 @@ ${reposList}`;
         }
       }
 
+      // Check if candidate uploaded a resume and extract spoken name if candidateDisplayName is still default or from github handle
+      let parsedResumeMeta: any = null;
+      if (interview.resumeMetadata) {
+        try {
+          parsedResumeMeta = typeof interview.resumeMetadata === "string"
+            ? JSON.parse(interview.resumeMetadata)
+            : interview.resumeMetadata;
+
+          if (parsedResumeMeta?.candidateName && parsedResumeMeta.candidateName !== "Candidate") {
+            const rawResumeName = parsedResumeMeta.candidateName.trim();
+            const cleanResumeFirst = rawResumeName.split(/[\s-_]/)[0] || rawResumeName;
+            if (cleanResumeFirst && cleanResumeFirst.length > 1) {
+              candidateDisplayName = cleanResumeFirst;
+            }
+          }
+        } catch (e) {
+          console.error("[GeminiLive] Error parsing resumeMetadata:", e);
+        }
+      }
+
       // Check if this interview already has messages in the database (indicating a post-grace reconnection or server restart)
       const existingMessages = await prisma.message.findMany({
         where: { interviewId },
@@ -204,6 +224,8 @@ ${reposList}`;
         selectedRepo: typeof interview.githubMetadata === "string" 
           ? (() => { try { return JSON.parse(interview.githubMetadata).selectedRepo || null; } catch { return null; } })()
           : (interview.githubMetadata as any)?.selectedRepo || null,
+        resumeMetadata: parsedResumeMeta || interview.resumeMetadata,
+        selectedResumeProject: interview.selectedResumeProject || null,
       });
 
       if (isResumingSession) {

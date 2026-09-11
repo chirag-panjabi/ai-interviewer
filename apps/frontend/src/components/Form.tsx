@@ -9,6 +9,7 @@ import { BACKEND_URL } from "../lib/config";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
+  ArrowLeft,
   Github,
   Loader2,
   Mic,
@@ -21,51 +22,25 @@ import {
   Cloud,
   Brain,
   Check,
-  Code2,
   RefreshCw,
   Key,
   Radio,
   Sparkles,
-  ShieldCheck,
-  Plus,
-  Star,
+  FileText,
   FolderGit2,
+  Plus,
+  BadgeCheck,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ApiKeyModal } from "./ApiKeyModal";
 import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "../lib/apiKeyStorage";
-
-type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
-
-type InterviewTrack =
-  | "FULL_MOCK_SCREEN"
-  | "FULLSTACK_GENERAL"
-  | "BACKEND"
-  | "FRONTEND"
-  | "SYSTEM_DESIGN"
-  | "DSA"
-  | "BEHAVIORAL"
-  | "DEVOPS_CLOUD"
-  | "ML_AI";
-
-interface RepoPreview {
-  name: string;
-  description: string | null;
-  language: string | null;
-  stars: number;
-  url: string;
-}
-
-interface ProfilePreview {
-  username: string;
-  name: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  publicReposCount: number;
-  repos: RepoPreview[];
-  rateLimited?: boolean;
-  error?: string | null;
-}
+import { ResumeUploader } from "./ResumeUploader";
+import type {
+  ExperienceLevel,
+  InterviewTrack,
+  ParsedResume,
+  ProfilePreview,
+} from "../types";
 
 const EXPERIENCE_LEVELS: Array<{
   id: ExperienceLevel;
@@ -156,22 +131,31 @@ const DOMAIN_TRACKS: Array<{
 const ALL_TRACKS = [FULL_MOCK_TRACK, ...DOMAIN_TRACKS];
 
 export function Form() {
-  const [github, setGithub] = useState("");
-  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("MID");
+  // Wizard Step: 1 = Track & Level, 2 = Context (Resume / GitHub), 3 = Review & Launch
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+
+  // Configuration State
   const [track, setTrack] = useState<InterviewTrack>("FULL_MOCK_SCREEN");
-  const [contextMode, setContextMode] = useState<"general" | "github">("general");
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("MID");
 
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [customKeyActive, setCustomKeyActive] = useState(() => hasCustomApiKey());
+  // Context State
+  const [contextTab, setContextTab] = useState<"resume" | "github" | "standard">("resume");
+  const [resumeData, setResumeData] = useState<ParsedResume | null>(null);
+  const [selectedResumeProject, setSelectedResumeProject] = useState<string | null>(null);
 
+  const [github, setGithub] = useState("");
   const [profilePreview, setProfilePreview] = useState<ProfilePreview | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [isCustomRepoMode, setIsCustomRepoMode] = useState(false);
   const [customRepoInput, setCustomRepoInput] = useState("");
+  const [githubValidationError, setGithubValidationError] = useState<string | null>(null);
+
+  // Session & Modal State
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [customKeyActive, setCustomKeyActive] = useState(() => hasCustomApiKey());
 
   const navigate = useNavigate();
   const timersRef = useRef<NodeJS.Timeout[]>([]);
@@ -184,7 +168,11 @@ export function Form() {
   const selectedLevelObj = EXPERIENCE_LEVELS.find((l) => l.id === experienceLevel);
 
   const loadingSteps = [
-    contextMode === "github" && github.trim()
+    resumeData && github.trim()
+      ? "Synthesizing resume and GitHub repository architecture..."
+      : resumeData
+      ? `Analyzing ${resumeData.candidateName}'s verified resume projects...`
+      : github.trim()
       ? "Inspecting GitHub architecture context..."
       : "Initializing track evaluation matrix...",
     `Calibrating ${selectedLevelObj?.label || "Mid-Level"} ${selectedTrackObj?.title || "Technical"} persona...`,
@@ -208,8 +196,8 @@ export function Form() {
       }
       if (urlUser && urlUser.trim()) {
         const cleanUser = urlUser.trim();
-        setContextMode("github");
         setGithub(cleanUser);
+        setContextTab("github");
         triggerPreviewFetch(cleanUser);
       }
     } catch {
@@ -280,7 +268,7 @@ export function Form() {
 
   function handleGithubChange(val: string) {
     setGithub(val);
-    if (validationError) setValidationError(null);
+    if (githubValidationError) setGithubValidationError(null);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
@@ -288,24 +276,11 @@ export function Form() {
     }, 350);
   }
 
-  function validateInput(value: string): boolean {
-    if (contextMode === "general") {
-      setValidationError(null);
-      return true;
-    }
-
-    if (!value.trim()) {
-      setValidationError("Please enter a GitHub username or repository link, or switch to Standard Practice.");
-      return false;
-    }
-
-    const { isValid } = parseInput(value);
-    if (!isValid) {
-      setValidationError("Please enter a valid GitHub username (e.g. 'torvalds') or repository link");
-      return false;
-    }
-    setValidationError(null);
-    return true;
+  function handleConnectGithubFromResume(username: string) {
+    setGithub(username);
+    setContextTab("github");
+    triggerPreviewFetch(username);
+    toast.success(`Connected GitHub @${username} from your resume!`);
   }
 
   function tryNavigate(interviewId: string) {
@@ -317,7 +292,6 @@ export function Form() {
 
   async function onSubmit() {
     if (loading) return;
-    if (!validateInput(github)) return;
 
     setLoading(true);
     setCurrentStep(0);
@@ -348,7 +322,7 @@ export function Form() {
       const customKey = getCustomApiKey();
 
       let finalSelectedRepo: string | null = null;
-      if (contextMode === "github") {
+      if (github.trim()) {
         if (isCustomRepoMode && customRepoInput.trim()) {
           finalSelectedRepo = customRepoInput.trim();
         } else if (selectedRepo && selectedRepo !== "__ALL__") {
@@ -356,7 +330,7 @@ export function Form() {
         }
       }
 
-      const finalGithub = contextMode === "github" && github.trim() ? github.trim() : "candidate";
+      const finalGithub = github.trim() ? github.trim() : "candidate";
 
       const response = await axios.post(
         `${BACKEND_URL}/api/v1/pre-interview`,
@@ -365,6 +339,8 @@ export function Form() {
           experienceLevel,
           track,
           selectedRepo: finalSelectedRepo,
+          resumeMetadata: resumeData || undefined,
+          selectedResumeProject: selectedResumeProject || undefined,
         },
         {
           timeout: 35000,
@@ -428,7 +404,7 @@ export function Form() {
         </header>
 
         {/* Clean Hero */}
-        <section className="mb-8 text-center sm:text-left">
+        <section className="mb-6 text-center sm:text-left">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             AI Technical Interviewer
           </h1>
@@ -437,467 +413,711 @@ export function Form() {
           </p>
         </section>
 
-        {/* Unified Studio Card */}
+        {/* 3-Step Wizard Navigation Header */}
+        <div className="mb-6 grid grid-cols-3 gap-2">
+          {[
+            { step: 1, label: "1. Track & Level", activeBadge: selectedLevelObj?.label },
+            {
+              step: 2,
+              label: "2. Your Context",
+              activeBadge: resumeData && github.trim()
+                ? "Resume + GitHub"
+                : resumeData
+                ? "Resume Attached"
+                : github.trim()
+                ? "GitHub Attached"
+                : "Standard / None",
+            },
+            { step: 3, label: "3. Review & Launch", activeBadge: "Ready" },
+          ].map((item) => {
+            const isCurrent = wizardStep === item.step;
+            const isCompleted = wizardStep > item.step;
+            return (
+              <button
+                key={item.step}
+                type="button"
+                disabled={loading}
+                onClick={() => setWizardStep(item.step as 1 | 2 | 3)}
+                className={cn(
+                  "flex flex-col items-start p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer",
+                  isCurrent
+                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                    : isCompleted
+                    ? "border-border/80 bg-background/80 hover:bg-background"
+                    : "border-border/40 bg-background/40 hover:bg-background/60 opacity-70"
+                )}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className={cn("text-xs font-bold", isCurrent ? "text-primary" : "text-foreground")}>
+                    {item.label}
+                  </span>
+                  {isCompleted && <Check className="size-3 text-emerald-400 stroke-[3]" />}
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-full">
+                  {item.activeBadge}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Studio Card Body */}
         <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-7 shadow-sm space-y-6 text-left">
           
-          {/* 1. Track Selector */}
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-              1. Choose Interview Mode & Track
-            </label>
+          {/* ========================================================================= */}
+          {/* STEP 1: TRACK & SENIORITY LEVEL                                           */}
+          {/* ========================================================================= */}
+          {wizardStep === 1 && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* 1. Track Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                  Choose Interview Mode & Track
+                </label>
 
-            {/* Featured Comprehensive Full Mock Banner */}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={track === "FULL_MOCK_SCREEN"}
-              disabled={loading}
-              onClick={() => setTrack("FULL_MOCK_SCREEN")}
-              className={cn(
-                "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer mb-3 relative",
-                track === "FULL_MOCK_SCREEN"
-                  ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                  : "border-border/70 bg-background/60 hover:border-border hover:bg-background/90",
-                loading && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="size-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="size-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-foreground">
-                      Comprehensive Full Mock Screen
-                    </span>
-                    <span className="rounded bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider">
-                      Full 360° Loop
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Intro Story · Flagship Project Deep-Dive · Live Tech Scenario · Behavioral · Reverse Q&A
-                  </p>
-                </div>
-              </div>
-              {track === "FULL_MOCK_SCREEN" && (
-                <Check className="size-4 text-primary stroke-[3] shrink-0 ml-2" />
-              )}
-            </button>
-
-            {/* Specialized Domain Track Pills (2x4 Grid) */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Or Target a Specific Technical Track:
-              </span>
-              <div role="radiogroup" aria-label="Select Focus Track" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {DOMAIN_TRACKS.map((t) => {
-                  const isSelected = track === t.id;
-                  const Icon = t.icon;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      disabled={loading}
-                      onClick={() => setTrack(t.id)}
-                      className={cn(
-                        "flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer relative",
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
-                        loading && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="flex items-center justify-between w-full mb-1.5">
-                        <Icon className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                        {isSelected && <Check className="size-3 text-primary stroke-[3]" />}
-                      </div>
-                      <span className="text-xs font-semibold text-foreground leading-tight">
-                        {t.title}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                        {t.description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Seniority Level */}
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-              2. Seniority Level
-            </label>
-            <div role="radiogroup" aria-label="Select Seniority Baseline" className="grid grid-cols-3 gap-2">
-              {EXPERIENCE_LEVELS.map((lvl) => {
-                const isSelected = experienceLevel === lvl.id;
-                return (
-                  <button
-                    key={lvl.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    disabled={loading}
-                    onClick={() => setExperienceLevel(lvl.id)}
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer",
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm"
-                        : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
-                      loading && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {lvl.label}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {lvl.sublabel}
-                      </span>
-                    </div>
-                    {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 3. Interview Context (Progressive Disclosure) */}
-          <div className="pt-2 border-t border-border/40">
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-              3. Interview Context (Optional)
-            </label>
-            
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setContextMode("general");
-                  setSelectedRepo(null);
-                  setIsCustomRepoMode(false);
-                  setValidationError(null);
-                }}
-                disabled={loading}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all cursor-pointer",
-                  contextMode === "general"
-                    ? "border-primary bg-primary/10 shadow-sm"
-                    : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80"
-                )}
-              >
-                <Sparkles className={cn("size-4 shrink-0", contextMode === "general" ? "text-primary" : "text-muted-foreground")} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">Standard Practice</span>
-                    {contextMode === "general" && <Check className="size-3 text-primary stroke-[3]" />}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground block truncate">Core domain concepts</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setContextMode("github");
-                  setValidationError(null);
-                }}
-                disabled={loading}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all cursor-pointer",
-                  contextMode === "github"
-                    ? "border-primary bg-primary/10 shadow-sm"
-                    : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80"
-                )}
-              >
-                <Github className={cn("size-4 shrink-0", contextMode === "github" ? "text-primary" : "text-muted-foreground")} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">Drill GitHub Repo</span>
-                    {contextMode === "github" && <Check className="size-3 text-primary stroke-[3]" />}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground block truncate">Architecture & code</span>
-                </div>
-              </button>
-            </div>
-
-            {/* GitHub Input & Repo Selector when contextMode === "github" */}
-            {contextMode === "github" && (
-              <div className="space-y-3 p-3.5 rounded-xl border border-border/80 bg-background/60 animate-in fade-in duration-200">
-                <div
+                {/* Featured Comprehensive Full Mock Banner */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={track === "FULL_MOCK_SCREEN"}
+                  disabled={loading}
+                  onClick={() => setTrack("FULL_MOCK_SCREEN")}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5 transition-all",
-                    validationError
-                      ? "border-destructive ring-1 ring-destructive/30"
-                      : "border-border/80 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/40"
+                    "w-full flex items-center justify-between p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer mb-3 relative",
+                    track === "FULL_MOCK_SCREEN"
+                      ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                      : "border-border/70 bg-background/60 hover:border-border hover:bg-background/90",
+                    loading && "opacity-50 cursor-not-allowed"
                   )}
                 >
-                  <Github className="size-4 text-muted-foreground shrink-0" />
-                  <Input
-                    value={github}
-                    aria-label="GitHub username or repository URL"
-                    placeholder="e.g. username or github.com/username/repo"
-                    onChange={(e) => handleGithubChange(e.target.value)}
-                    onBlur={() => triggerPreviewFetch(github)}
-                    onKeyDown={(e) => e.key === "Enter" && !loading && onSubmit()}
-                    disabled={loading}
-                    className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-xs font-mono h-8 p-0"
-                    autoFocus={!github}
-                  />
-                  {github.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => triggerPreviewFetch(github)}
-                      disabled={fetchingPreview || loading}
-                      aria-label="Scan GitHub repositories"
-                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      {fetchingPreview ? (
-                        <Loader2 className="size-3.5 animate-spin text-primary" />
-                      ) : (
-                        <RefreshCw className="size-3.5" />
-                      )}
-                    </button>
-                  )}
-                </div>
-
-                {validationError && (
-                  <p className="text-xs font-medium text-destructive">
-                    {validationError}
-                  </p>
-                )}
-
-                {/* Quick Demos */}
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="font-mono text-[10px] uppercase">Try Quick Demo:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGithub("torvalds");
-                      triggerPreviewFetch("torvalds");
-                    }}
-                    className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-mono hover:border-primary hover:text-primary transition-colors cursor-pointer"
-                  >
-                    torvalds
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGithub("facebook");
-                      triggerPreviewFetch("facebook");
-                    }}
-                    className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-mono hover:border-primary hover:text-primary transition-colors cursor-pointer"
-                  >
-                    facebook
-                  </button>
-                </div>
-
-                {/* Scanned Repositories List + All Profile + Custom Repo */}
-                {profilePreview && (
-                  <div className="pt-2 border-t border-border/40 space-y-2">
-                    <span className="text-[11px] font-medium text-muted-foreground block">
-                      Select Architecture Focus:
-                    </span>
-
-                    {/* General Profile (All Repos) option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRepo("__ALL__");
-                        setIsCustomRepoMode(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-                        !isCustomRepoMode && selectedRepo === "__ALL__"
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border/60 bg-background hover:border-border"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FolderGit2 className="size-3.5 text-primary shrink-0" />
-                        <div>
-                          <span className="text-xs font-semibold text-foreground block">
-                            General Profile Portfolio
-                          </span>
-                          <span className="text-[10px] text-muted-foreground block">
-                            Discuss architecture across all public repositories ({profilePreview.publicReposCount} total)
-                          </span>
-                        </div>
-                      </div>
-                      {!isCustomRepoMode && selectedRepo === "__ALL__" && (
-                        <Check className="size-3 text-primary stroke-[3] shrink-0" />
-                      )}
-                    </button>
-
-                    {/* Scanned Repositories Grid */}
-                    {profilePreview.repos && profilePreview.repos.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {profilePreview.repos.slice(0, 6).map((r) => {
-                          const isSelected = !isCustomRepoMode && selectedRepo === r.name;
-                          return (
-                            <button
-                              key={r.name}
-                              type="button"
-                              onClick={() => {
-                                setSelectedRepo(r.name);
-                                setIsCustomRepoMode(false);
-                              }}
-                              className={cn(
-                                "flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-                                isSelected
-                                  ? "border-primary bg-primary/10 shadow-sm"
-                                  : "border-border/60 bg-background hover:border-border"
-                              )}
-                            >
-                              <div className="min-w-0 flex-1 pr-2">
-                                <span className="text-xs font-semibold font-mono text-foreground block truncate">
-                                  {r.name}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground block truncate">
-                                  {r.language || "Repository"} {r.stars > 0 && `· ${r.stars}★`}
-                                </span>
-                              </div>
-                              {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Custom Repository Mode Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCustomRepoMode(true);
-                        setSelectedRepo(null);
-                      }}
-                      className={cn(
-                        "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-                        isCustomRepoMode
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border/60 bg-background hover:border-border"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Plus className="size-3.5 text-primary shrink-0" />
-                        <div>
-                          <span className="text-xs font-semibold text-foreground block">
-                            Target Other / Specific Repository...
-                          </span>
-                          <span className="text-[10px] text-muted-foreground block">
-                            Specify any other project name from this profile
-                          </span>
-                        </div>
-                      </div>
-                      {isCustomRepoMode && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
-                    </button>
-
-                    {isCustomRepoMode && (
-                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-primary/50 bg-background p-1.5 animate-in fade-in">
-                        <span className="pl-2 text-xs font-mono text-muted-foreground shrink-0">
-                          Repo:
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="size-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                      <Sparkles className="size-4 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-foreground">
+                          Comprehensive Full Mock Screen
                         </span>
-                        <Input
-                          value={customRepoInput}
-                          placeholder="e.g. my-project-name or distributed-cache"
-                          onChange={(e) => setCustomRepoInput(e.target.value)}
-                          disabled={loading}
-                          className="h-8 border-0 bg-transparent text-xs font-mono focus-visible:ring-0 p-0"
-                          autoFocus
-                        />
+                        <span className="rounded bg-primary/15 text-primary border border-primary/30 px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider">
+                          Full 360° Loop
+                        </span>
                       </div>
-                    )}
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Intro Story · Flagship Project Deep-Dive · Live Tech Scenario · Behavioral · Reverse Q&A
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  {track === "FULL_MOCK_SCREEN" && (
+                    <Check className="size-4 text-primary stroke-[3] shrink-0 ml-2" />
+                  )}
+                </button>
 
-          {/* Primary Action Button */}
-          <div className="pt-4 border-t border-border/40 space-y-3">
-            <Button
-              disabled={loading}
-              onClick={onSubmit}
-              size="lg"
-              className="w-full gap-2 rounded-xl font-semibold text-sm py-6 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Calibrating Audio Room...
-                </>
-              ) : (
-                <>
-                  <Mic className="size-4" />
-                  Start Live Voice Interview ({selectedLevelObj?.label} · {selectedTrackObj?.title})
-                  <ArrowRight className="size-4" />
-                </>
-              )}
-            </Button>
-
-            {/* Stepped Loading Animation */}
-            {loading && (
-              <div className="pt-2 animate-in fade-in duration-200">
+                {/* Specialized Domain Track Pills (2x4 Grid) */}
                 <div className="space-y-1.5">
-                  {loadingSteps.map((stepText, idx) => {
-                    const isDone = currentStep > idx;
-                    const isCurrent = currentStep === idx;
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Or Target a Specific Technical Track:
+                  </span>
+                  <div role="radiogroup" aria-label="Select Focus Track" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {DOMAIN_TRACKS.map((t) => {
+                      const isSelected = track === t.id;
+                      const Icon = t.icon;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          disabled={loading}
+                          onClick={() => setTrack(t.id)}
+                          className={cn(
+                            "flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer relative",
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
+                            loading && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <div className="flex items-center justify-between w-full mb-1.5">
+                            <Icon className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
+                            {isSelected && <Check className="size-3 text-primary stroke-[3]" />}
+                          </div>
+                          <span className="text-xs font-semibold text-foreground leading-tight">
+                            {t.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                            {t.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Seniority Level */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                  Seniority Level
+                </label>
+                <div role="radiogroup" aria-label="Select Seniority Baseline" className="grid grid-cols-3 gap-2">
+                  {EXPERIENCE_LEVELS.map((lvl) => {
+                    const isSelected = experienceLevel === lvl.id;
                     return (
-                      <div
-                        key={idx}
+                      <button
+                        key={lvl.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        disabled={loading}
+                        onClick={() => setExperienceLevel(lvl.id)}
                         className={cn(
-                          "flex items-center gap-2 text-xs transition-opacity duration-200",
-                          isDone
-                            ? "text-emerald-400"
-                            : isCurrent
-                            ? "text-foreground font-medium"
-                            : "text-muted-foreground/40"
+                          "flex items-center justify-between rounded-xl border p-3 text-left transition-all cursor-pointer",
+                          isSelected
+                            ? "border-primary bg-primary/10 shadow-sm"
+                            : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80",
+                          loading && "opacity-50 cursor-not-allowed"
                         )}
                       >
-                        {isDone ? (
-                          <Check className="size-3 text-emerald-400 stroke-[3] shrink-0" />
-                        ) : isCurrent ? (
-                          <Loader2 className="size-3 animate-spin text-primary shrink-0" />
-                        ) : (
-                          <span className="size-1.5 rounded-full bg-border shrink-0 ml-1 mr-0.5" />
-                        )}
-                        <span>{stepText}</span>
-                      </div>
+                        <div>
+                          <span className="text-xs font-semibold text-foreground block">
+                            {lvl.label}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {lvl.sublabel}
+                          </span>
+                        </div>
+                        {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
+                      </button>
                     );
                   })}
                 </div>
               </div>
-            )}
 
-            {!loading && (
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="size-3.5 text-emerald-400" />
-                  Zero credentials stored. Encrypted live WebSocket audio.
-                </span>
-                <span className="hidden sm:inline-block">
-                  Mic prompted on entry
-                </span>
+              {/* Next Step Button */}
+              <div className="pt-3 border-t border-border/40 flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => setWizardStep(2)}
+                  className="gap-2 rounded-xl font-semibold text-xs px-5 py-2.5 cursor-pointer"
+                >
+                  <span>Next: Add Context (Resume / GitHub)</span>
+                  <ArrowRight className="size-3.5" />
+                </Button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* STEP 2: CANDIDATE CONTEXT (RESUME / GITHUB / STANDARD)                    */}
+          {/* ========================================================================= */}
+          {wizardStep === 2 && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Candidate Context</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Provide your resume or GitHub codebase for Alex to drill your actual claims and architecture.
+                  </p>
+                </div>
+                {/* Active Context Indicators */}
+                <div className="flex items-center gap-1.5">
+                  {resumeData && (
+                    <span className="rounded bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 text-[10px] font-semibold flex items-center gap-1">
+                      <FileText className="size-3" />
+                      Resume Attached
+                    </span>
+                  )}
+                  {github.trim() && (
+                    <span className="rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold flex items-center gap-1">
+                      <Github className="size-3" />
+                      @{github.trim()}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Context Mode Tabs */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setContextTab("resume")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer",
+                    contextTab === "resume"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40 shadow-sm"
+                      : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80"
+                  )}
+                >
+                  <FileText className={cn("size-4 mb-1", contextTab === "resume" ? "text-primary" : "text-muted-foreground")} />
+                  <span className="text-xs font-semibold text-foreground">Upload Resume</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">PDF or plain text</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setContextTab("github")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer",
+                    contextTab === "github"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40 shadow-sm"
+                      : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80"
+                  )}
+                >
+                  <Github className={cn("size-4 mb-1", contextTab === "github" ? "text-primary" : "text-muted-foreground")} />
+                  <span className="text-xs font-semibold text-foreground">Link GitHub Repo</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Inspect real repos</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setContextTab("standard")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer",
+                    contextTab === "standard"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/40 shadow-sm"
+                      : "border-border/60 bg-background/50 hover:border-border hover:bg-background/80"
+                  )}
+                >
+                  <Sparkles className={cn("size-4 mb-1", contextTab === "standard" ? "text-primary" : "text-muted-foreground")} />
+                  <span className="text-xs font-semibold text-foreground">Standard Practice</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Pure domain grilling</span>
+                </button>
+              </div>
+
+              {/* Tab 1: Resume Uploader */}
+              {contextTab === "resume" && (
+                <ResumeUploader
+                  resume={resumeData}
+                  onResumeParsed={(parsed) => {
+                    setResumeData(parsed);
+                    if (parsed.projects && parsed.projects.length > 0) {
+                      setSelectedResumeProject(parsed.projects[0]?.name || null);
+                    }
+                  }}
+                  onClearResume={() => {
+                    setResumeData(null);
+                    setSelectedResumeProject(null);
+                  }}
+                  selectedProject={selectedResumeProject}
+                  onSelectProject={setSelectedResumeProject}
+                  onConnectGithub={handleConnectGithubFromResume}
+                  disabled={loading}
+                />
+              )}
+
+              {/* Tab 2: GitHub Repo Picker */}
+              {contextTab === "github" && (
+                <div className="space-y-3 p-4 rounded-xl border border-border/80 bg-background/60 animate-in fade-in duration-200">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5 transition-all",
+                      githubValidationError
+                        ? "border-destructive ring-1 ring-destructive/30"
+                        : "border-border/80 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/40"
+                    )}
+                  >
+                    <Github className="size-4 text-muted-foreground shrink-0" />
+                    <Input
+                      value={github}
+                      aria-label="GitHub username or repository URL"
+                      placeholder="e.g. username or github.com/username/repo"
+                      onChange={(e) => handleGithubChange(e.target.value)}
+                      onBlur={() => triggerPreviewFetch(github)}
+                      disabled={loading}
+                      className="border-0 bg-transparent shadow-none focus-visible:ring-0 text-xs font-mono h-8 p-0"
+                      autoFocus={!github}
+                    />
+                    {github.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => triggerPreviewFetch(github)}
+                        disabled={fetchingPreview || loading}
+                        aria-label="Scan GitHub repositories"
+                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        {fetchingPreview ? (
+                          <Loader2 className="size-3.5 animate-spin text-primary" />
+                        ) : (
+                          <RefreshCw className="size-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {githubValidationError && (
+                    <p className="text-xs font-medium text-destructive">
+                      {githubValidationError}
+                    </p>
+                  )}
+
+                  {/* Quick Demos */}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="font-mono text-[10px] uppercase">Quick Demos:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGithub("torvalds");
+                        triggerPreviewFetch("torvalds");
+                      }}
+                      className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-mono hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                    >
+                      torvalds
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGithub("facebook");
+                        triggerPreviewFetch("facebook");
+                      }}
+                      className="rounded border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-mono hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                    >
+                      facebook
+                    </button>
+                  </div>
+
+                  {/* Scanned Repositories List */}
+                  {profilePreview && (
+                    <div className="pt-2 border-t border-border/40 space-y-2">
+                      <span className="text-[11px] font-medium text-muted-foreground block">
+                        Select Architecture Focus:
+                      </span>
+
+                      {/* General Profile (All Repos) option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRepo("__ALL__");
+                          setIsCustomRepoMode(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                          !isCustomRepoMode && selectedRepo === "__ALL__"
+                            ? "border-primary bg-primary/10 shadow-sm"
+                            : "border-border/60 bg-background hover:border-border"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FolderGit2 className="size-3.5 text-primary shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-foreground block">
+                              General Profile Portfolio
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block">
+                              Discuss architecture across all public repositories ({profilePreview.publicReposCount} total)
+                            </span>
+                          </div>
+                        </div>
+                        {!isCustomRepoMode && selectedRepo === "__ALL__" && (
+                          <Check className="size-3 text-primary stroke-[3] shrink-0" />
+                        )}
+                      </button>
+
+                      {/* Scanned Repositories Grid */}
+                      {profilePreview.repos && profilePreview.repos.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {profilePreview.repos.slice(0, 6).map((r) => {
+                            const isSelected = !isCustomRepoMode && selectedRepo === r.name;
+                            return (
+                              <button
+                                key={r.name}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRepo(r.name);
+                                  setIsCustomRepoMode(false);
+                                }}
+                                className={cn(
+                                  "flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                                  isSelected
+                                    ? "border-primary bg-primary/10 shadow-sm"
+                                    : "border-border/60 bg-background hover:border-border"
+                                )}
+                              >
+                                <div className="min-w-0 flex-1 pr-2">
+                                  <span className="text-xs font-semibold font-mono text-foreground block truncate">
+                                    {r.name}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground block truncate">
+                                    {r.language || "Repository"} {r.stars > 0 && `· ${r.stars}★`}
+                                  </span>
+                                </div>
+                                {isSelected && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Custom Repository Mode */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomRepoMode(true);
+                          setSelectedRepo(null);
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer",
+                          isCustomRepoMode
+                            ? "border-primary bg-primary/10 shadow-sm"
+                            : "border-border/60 bg-background hover:border-border"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Plus className="size-3.5 text-primary shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-foreground block">
+                              Target Other / Specific Repository...
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block">
+                              Specify any other project name from this profile
+                            </span>
+                          </div>
+                        </div>
+                        {isCustomRepoMode && <Check className="size-3 text-primary stroke-[3] shrink-0" />}
+                      </button>
+
+                      {isCustomRepoMode && (
+                        <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-primary/50 bg-background p-1.5 animate-in fade-in">
+                          <span className="pl-2 text-xs font-mono text-muted-foreground shrink-0">
+                            Repo:
+                          </span>
+                          <Input
+                            value={customRepoInput}
+                            placeholder="e.g. my-project-name or distributed-cache"
+                            onChange={(e) => setCustomRepoInput(e.target.value)}
+                            disabled={loading}
+                            className="h-8 border-0 bg-transparent text-xs font-mono focus-visible:ring-0 p-0"
+                            autoFocus
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Standard Practice Notice */}
+              {contextTab === "standard" && (
+                <div className="rounded-xl border border-border/80 bg-background/60 p-5 text-center space-y-2">
+                  <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary mx-auto">
+                    <Sparkles className="size-5" />
+                  </div>
+                  <h4 className="text-xs font-bold text-foreground">Standard Curriculum Practice</h4>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Alex will dynamically generate rigorous production scenarios, architecture trade-offs, and technical problem-solving suited for a {selectedLevelObj?.label} {selectedTrackObj?.title} engineer without requiring a resume or repo.
+                  </p>
+                </div>
+              )}
+
+              {/* Step Navigation Buttons */}
+              <div className="pt-3 border-t border-border/40 flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setWizardStep(1)}
+                  className="gap-1.5 rounded-xl font-semibold text-xs px-4 cursor-pointer"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  <span>Back to Track</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => setWizardStep(3)}
+                  className="gap-2 rounded-xl font-semibold text-xs px-5 py-2.5 cursor-pointer"
+                >
+                  <span>Review & Launch</span>
+                  <ArrowRight className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* STEP 3: REVIEW & LAUNCH                                                   */}
+          {/* ========================================================================= */}
+          {wizardStep === 3 && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Interview Session Summary</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Confirm your interview parameters before entering the live voice room with Alex.
+                </p>
+              </div>
+
+              {/* High-Contrast Summary Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Track Card */}
+                <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Domain Track
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">
+                      {selectedTrackObj?.title}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedTrackObj?.description}
+                  </p>
+                </div>
+
+                {/* Level Card */}
+                <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Seniority Calibration
+                  </span>
+                  <span className="text-sm font-bold text-foreground">
+                    {selectedLevelObj?.label}
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedLevelObj?.sublabel} · Rigorous Tier-1 scoring bar
+                  </p>
+                </div>
+
+                {/* Resume Card */}
+                <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Resume Context
+                  </span>
+                  {resumeData ? (
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="size-3.5 text-primary" />
+                        <span className="text-xs font-semibold text-foreground">
+                          {resumeData.candidateName}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {selectedResumeProject ? `Focus: ${selectedResumeProject}` : "All detected projects"} · {resumeData.skills?.length || 0} skills
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">None attached</p>
+                  )}
+                </div>
+
+                {/* Codebase Card */}
+                <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    GitHub Codebase Context
+                  </span>
+                  {github.trim() ? (
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Github className="size-3.5 text-emerald-400" />
+                        <span className="text-xs font-semibold font-mono text-foreground">
+                          @{github.trim()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                        {selectedRepo && selectedRepo !== "__ALL__" ? selectedRepo : "All public repositories"}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Standard Practice (No public repo)</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-border/40 space-y-3">
+                <Button
+                  disabled={loading}
+                  onClick={onSubmit}
+                  size="lg"
+                  className="w-full gap-2 rounded-xl font-semibold text-sm py-6 cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Calibrating Audio Room...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="size-4" />
+                      Start Live Voice Interview ({selectedLevelObj?.label} · {selectedTrackObj?.title})
+                      <ArrowRight className="size-4" />
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={loading}
+                    onClick={() => setWizardStep(2)}
+                    className="gap-1.5 rounded-xl font-semibold text-xs px-4 cursor-pointer"
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    <span>Back to Edit Context</span>
+                  </Button>
+
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <BadgeCheck className="size-3.5 text-emerald-500" />
+                    Instant Tier-1 Rubric Feedback
+                  </span>
+                </div>
+
+                {/* Stepped Loading Animation */}
+                {loading && (
+                  <div className="pt-2 animate-in fade-in duration-200">
+                    <div className="space-y-1.5">
+                      {loadingSteps.map((stepText, idx) => {
+                        const isDone = currentStep > idx;
+                        const isCurrent = currentStep === idx;
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "flex items-center gap-2 text-xs transition-opacity duration-300",
+                              isDone ? "text-muted-foreground/60" : isCurrent ? "text-foreground font-medium" : "text-muted-foreground/30"
+                            )}
+                          >
+                            {isDone ? (
+                              <Check className="size-3 text-emerald-500 shrink-0 stroke-[3]" />
+                            ) : isCurrent ? (
+                              <Loader2 className="size-3 animate-spin text-primary shrink-0" />
+                            ) : (
+                              <span className="size-3 rounded-full border border-border/60 shrink-0 inline-block" />
+                            )}
+                            <span className="truncate">{stepText}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* Minimal Colophon Footer */}
-        <footer className="mt-8 text-center text-xs text-muted-foreground/70 pb-4">
-          <p>
-            AI Technical Interviewer · Built for High-Signal Engineering Evaluations
-          </p>
+        {/* Hallmark Footer Status */}
+        <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/40 pt-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px]">AI INTERVIEWER</span>
+            <span>·</span>
+            <span>Realistic Voice Technical Screens</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span>Low-Latency WebSockets</span>
+            <span>·</span>
+            <span>Gemini Multimodal Live</span>
+          </div>
         </footer>
       </div>
 
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        onKeyChange={(hasKey) => setCustomKeyActive(hasKey)}
+        onClose={() => {
+          setIsApiKeyModalOpen(false);
+          setCustomKeyActive(hasCustomApiKey());
+        }}
       />
     </main>
   );
 }
+export default Form;

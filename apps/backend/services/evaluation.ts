@@ -36,7 +36,8 @@ export async function calculateResult(
   githubMetadata?: any,
   experienceLevel: string = "MID",
   track: string = "FULLSTACK_GENERAL",
-  customApiKey?: string
+  customApiKey?: string,
+  resumeMetadata?: any
 ): Promise<{ score: number; feedback: string; evaluationData: EvaluationResult }> {
   const activeKey = customApiKey?.trim() || config.GEMINI_API_KEY;
   if (!activeKey) {
@@ -78,6 +79,7 @@ export async function calculateResult(
     track: track as any,
     transcriptFormatted,
     githubMetadata,
+    resumeMetadata,
   });
 
   // Candidate models in order of priority: gemini-flash-latest -> gemini-3.5-flash-lite -> fallbacks

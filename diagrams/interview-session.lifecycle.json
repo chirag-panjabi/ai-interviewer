@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Interview Session Lifecycle",
+    "subtitle": "Candidate session state machine from intake to evaluation & resilience",
+    "output": "diagrams/interview-session.html",
+    "viewBox": [980, 660],
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-session-rail",
+        "label": "Main session rail",
+        "focus": ["created", "pre_warm", "in_progress", "evaluating", "completed"],
+        "note": "Follow the ordered progression from candidate intake to finalized dossier."
+      },
+      {
+        "id": "connection-resilience",
+        "label": "Connection resilience",
+        "focus": ["in_progress", "grace_window", "abandoned"],
+        "note": "30-second preserved Gemini Live session prevents data loss during Wi-Fi drops."
+      },
+      {
+        "id": "evaluation-safety",
+        "label": "Evaluation fallback",
+        "focus": ["evaluating", "eval_retry", "completed", "failed"],
+        "note": "Deterministic regex heuristic rescues unparseable LLM output before fatal failure."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Session Phases" },
+    { "id": "resilience", "label": "Connection & Fallback Window" },
+    { "id": "terminal", "label": "Terminal Outcomes" }
+  ],
+  "states": [
+    { "id": "created", "type": "start", "label": "Created", "sublabel": "candidate intake", "lane": "main", "col": 0, "step": "01", "tag": "init" },
+    { "id": "pre_warm", "type": "active", "label": "Pre-Warm", "sublabel": "repo scan & prompt", "lane": "main", "col": 1, "step": "02", "tag": "setup" },
+    { "id": "in_progress", "type": "active", "label": "In-Progress", "sublabel": "live audio stream", "lane": "main", "col": 2, "step": "03", "tag": "streaming" },
+    { "id": "evaluating", "type": "decision", "label": "Evaluating", "sublabel": "5-rubric scoring", "lane": "main", "col": 3, "step": "04", "tag": "analysis" },
+    { "id": "completed", "type": "success", "label": "Completed", "sublabel": "dossier persisted", "lane": "main", "col": 4, "step": "05", "tag": "finished" },
+    { "id": "grace_window", "type": "waiting", "label": "Grace Window", "sublabel": "30s socket hold", "lane": "resilience", "col": 0, "tag": "timer-30s" },
+    { "id": "eval_retry", "type": "active", "label": "Heuristic Rescue", "sublabel": "regex fallback", "lane": "resilience", "col": 1, "tag": "recovery" },
+    { "id": "abandoned", "type": "failure", "label": "Abandoned", "sublabel": "grace expired (>30s)", "lane": "terminal", "col": 0, "tag": "timeout" },
+    { "id": "failed", "type": "failure", "label": "Failed", "sublabel": "unrecoverable fault", "lane": "terminal", "col": 1, "tag": "fatal" }
+  ],
+  "transitions": [
+    { "id": "disconnect", "from": "in_progress", "to": "grace_window", "label": "socket drop", "labelAt": [402, 233], "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "straight" },
+    { "id": "reconnect", "from": "grace_window", "to": "in_progress", "label": "reconnected", "labelAt": [210, 68], "variant": "emphasis", "fromSide": "left", "toSide": "top", "via": [[20, 307], [20, 80], [402, 80]] },
+    { "id": "abandon", "from": "grace_window", "to": "abandoned", "label": "timeout >30s", "labelAt": [402, 393], "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "straight" },
+    { "id": "parse-failure", "from": "evaluating", "to": "eval_retry", "label": "parse error", "labelAt": [556, 233], "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "straight" },
+    { "id": "rescue-success", "from": "eval_retry", "to": "completed", "label": "rescued", "variant": "emphasis", "fromSide": "right", "toSide": "bottom" },
+    { "id": "eval-fatal", "from": "eval_retry", "to": "failed", "label": "fatal fault", "labelAt": [556, 393], "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "straight" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Primary Progression",
+      "items": [
+        "Five ordered phases from initial GitHub intake to finalized evaluation dossier",
+        "Gemini Live WebSocket session established only after pre-warming system prompts"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "30-Second Grace Window",
+      "items": [
+        "Unexpected client drops hold the Gemini Live connection open for up to 30 seconds",
+        "Candidate reattachment resumes audio conversation without losing context or turns"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Defensive Fault Boundaries",
+      "items": [
+        "Grace timer expiry triggers clean socket teardown and moves session to Abandoned",
+        "Evaluator LLM JSON failures trigger regex fallback before terminal failure"
+      ]
+    }
+  ]
+}

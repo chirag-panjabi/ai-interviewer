@@ -150,6 +150,14 @@ export function Interview() {
     const recorder = new LiveMicrophoneRecorder((pcm) => {
       const ws = socketRef.current;
       if (ws && ws.readyState === WebSocket.OPEN && !isMutedRef.current) {
+        // Acoustic Echo Gate: When Alex is actively speaking, ignore quiet laptop speaker bleed (< 0.08 RMS).
+        // If candidate speaks up to interrupt (> 0.08 RMS), forward audio immediately for barge-in.
+        if (playerRef.current?.isPlaying()) {
+          const micVol = recorderRef.current?.getVolumeLevel() || 0;
+          if (micVol < 0.08) {
+            return;
+          }
+        }
         try { ws.send(JSON.stringify({ type: "audio", pcm })); } catch (e) {}
       }
     });

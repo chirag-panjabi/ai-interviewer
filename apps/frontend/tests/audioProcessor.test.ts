@@ -40,4 +40,44 @@ describe("Audio Processing Utilities", () => {
     expect(int16[0]).toBe(32767); // max Int16
     expect(int16[1]).toBe(-32768); // min Int16
   });
+
+  it("should initialize LiveAudioPlayer and report correct initial playing state", () => {
+    // Mock minimal AudioContext for headless Bun environment
+    if (typeof (globalThis as any).AudioContext === "undefined") {
+      (globalThis as any).AudioContext = class MockAudioContext {
+        currentTime = 1.0;
+        state = "running";
+        sampleRate = 24000;
+        destination = {};
+        createGain() { return { gain: { value: 1.0 }, connect: () => {} }; }
+        createAnalyser() { return { fftSize: 256, smoothingTimeConstant: 0.8, connect: () => {} }; }
+        createBuffer(channels: number, length: number, rate: number) {
+          return { duration: length / rate, copyToChannel: () => {} };
+        }
+        createBufferSource() { return { connect: () => {}, start: () => {} }; }
+        resume() { return Promise.resolve(); }
+        close() { return Promise.resolve(); }
+      };
+    }
+
+    const { LiveAudioPlayer } = require("../src/lib/audioProcessor");
+    const player = new LiveAudioPlayer();
+    expect(player.isPlaying()).toBe(false);
+
+    player.warmUp();
+    expect(player.isPlaying()).toBe(false);
+
+    // Enqueue a chunk
+    const samples = new Float32Array(2400); // 100ms at 24kHz
+    const base64 = float32ToBase64PCM(samples);
+    player.enqueueChunk(base64, 24000);
+
+    // Audio should now be queued / playing
+    expect(player.isPlaying()).toBe(true);
+
+    // After interrupt, should reset immediately
+    player.interrupt();
+    expect(player.isPlaying()).toBe(false);
+  });
 });
+

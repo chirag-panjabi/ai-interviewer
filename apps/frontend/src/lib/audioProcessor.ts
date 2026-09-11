@@ -7,6 +7,16 @@
  * - Dual-track SessionAudioRecorder mixing candidate mic + AI interviewer with zero JS GC overhead
  */
 
+function getAudioContextClass(): typeof AudioContext | null {
+  if (typeof window !== "undefined") {
+    return window.AudioContext || (window as any).webkitAudioContext || null;
+  }
+  if (typeof globalThis !== "undefined" && (globalThis as any).AudioContext) {
+    return (globalThis as any).AudioContext;
+  }
+  return null;
+}
+
 export class LiveAudioPlayer {
   private ctx: AudioContext | null = null;
   private masterGainNode: GainNode | null = null;
@@ -14,6 +24,12 @@ export class LiveAudioPlayer {
   private analyserData: Uint8Array | null = null;
   private nextPlayTime = 0;
   private activeSources: AudioBufferSourceNode[] = [];
+  private remainderByte: number | null = null;
+
+  // 180ms buffer headway absorbs packet arrival jitter and prevents audio underruns between streaming words
+  private static readonly JITTER_BUFFER_SECS = 0.18;
+  // Prevent excessive latency buildup if server pushes chunks in a fast burst
+  private static readonly MAX_AHEAD_SECS = 0.80;
 
   constructor() {
     // Lazy init or warm up on user gesture
@@ -21,7 +37,9 @@ export class LiveAudioPlayer {
 
   public warmUp(): void {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = getAudioContextClass();
+      if (!AudioCtx) return;
+
       if (!this.ctx || this.ctx.state === "closed") {
         try {
           this.ctx = new AudioCtx({ sampleRate: 24000 });
@@ -96,6 +114,11 @@ export class LiveAudioPlayer {
     return !this.ctx || this.ctx.state === "suspended";
   }
 
+  public isPlaying(): boolean {
+    if (!this.ctx) return false;
+    return this.nextPlayTime > this.ctx.currentTime;
+  }
+
   public enqueueChunk(base64Pcm: string, sampleRate = 24000): void {
     if (!this.ctx || this.ctx.state === "closed") {
       this.warmUp();
@@ -110,15 +133,33 @@ export class LiveAudioPlayer {
       const binary = typeof globalThis.atob !== "undefined"
         ? globalThis.atob(base64Pcm)
         : Buffer.from(base64Pcm, "base64").toString("binary");
-      const len = binary.length;
-      if (len < 2) return;
+      const incomingLen = binary.length;
+      if (incomingLen === 0) return;
 
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
+      const hasRemainder = this.remainderByte !== null;
+      const totalBytesLen = incomingLen + (hasRemainder ? 1 : 0);
+
+      const bytes = new Uint8Array(totalBytesLen);
+      let offset = 0;
+      if (hasRemainder) {
+        bytes[0] = this.remainderByte!;
+        offset = 1;
+        this.remainderByte = null;
       }
 
-      const numSamples = Math.floor(len / 2);
+      for (let i = 0; i < incomingLen; i++) {
+        bytes[offset + i] = binary.charCodeAt(i);
+      }
+
+      // If total bytes is odd, preserve trailing byte for next incoming chunk to maintain 16-bit alignment
+      const isOdd = totalBytesLen % 2 !== 0;
+      if (isOdd) {
+        this.remainderByte = bytes[totalBytesLen - 1]!;
+      }
+
+      const numSamples = Math.floor(totalBytesLen / 2);
+      if (numSamples === 0) return;
+
       const int16 = new Int16Array(bytes.buffer, 0, numSamples);
       const float32 = new Float32Array(numSamples);
 
@@ -141,10 +182,15 @@ export class LiveAudioPlayer {
       }
 
       const now = ctx.currentTime;
-      // If there was a long pause, reset nextPlayTime to current time
+      // If queue ran dry (underrun) or this is the first chunk of a turn,
+      // prime a 180ms jitter buffer headway so subsequent packets queue up before audio starts
       if (this.nextPlayTime < now) {
-        this.nextPlayTime = now;
+        this.nextPlayTime = now + LiveAudioPlayer.JITTER_BUFFER_SECS;
+      } else if (this.nextPlayTime > now + LiveAudioPlayer.MAX_AHEAD_SECS) {
+        // Clamp runaway ahead time
+        this.nextPlayTime = now + LiveAudioPlayer.MAX_AHEAD_SECS;
       }
+
       const startTime = this.nextPlayTime;
       source.start(startTime);
       this.nextPlayTime = startTime + audioBuffer.duration;
@@ -172,8 +218,9 @@ export class LiveAudioPlayer {
       }
     }
     this.activeSources = [];
+    this.remainderByte = null;
     if (this.ctx) {
-      this.nextPlayTime = this.ctx.currentTime;
+      this.nextPlayTime = 0;
     }
   }
 
@@ -285,7 +332,8 @@ export class LiveMicrophoneRecorder {
       });
     }
 
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioCtx = getAudioContextClass();
+    if (!AudioCtx) throw new Error("AudioContext not supported in this environment");
     this.audioCtx = new AudioCtx();
 
     if (this.audioCtx.state === "suspended") {
@@ -434,8 +482,8 @@ export class SessionAudioRecorder {
 
     try {
       const playerCtx = player.getContext();
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioCtx = playerCtx || new AudioCtx();
+      const AudioCtx = getAudioContextClass();
+      this.audioCtx = playerCtx || (AudioCtx ? new AudioCtx() : null);
 
       if (this.audioCtx.state === "suspended") {
         this.audioCtx.resume().catch(() => {});

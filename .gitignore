@@ -40,5 +40,8 @@ yarn-error.log*
 # Local Documentation (not tracked in remote git)
 docs/
 
+# Annotated Study Guide Codebase (Interview Prep)
+explained-codebase/
+
 
 

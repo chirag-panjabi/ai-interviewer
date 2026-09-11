@@ -121,29 +121,6 @@ interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res
   }
 });
 
-// 2. Add manual user message (fallback/testing)
-interviewRouter.post("/session/user/response/:interviewId", async (req, res) => {
-  const { message } = req.body;
-  if (!message) {
-    res.status(400).json({ message: "Message is required" });
-    return;
-  }
-
-  try {
-    await prisma.message.create({
-      data: {
-        interviewId: req.params.interviewId as string,
-        type: "User",
-        message: String(message),
-      },
-    });
-
-    res.json({ message: "Message saved" });
-  } catch (err: any) {
-    res.status(500).json({ message: "Failed to save message" });
-  }
-});
-
 // 3. Get / Trigger evaluation result
 interviewRouter.get("/result/:interviewId", async (req, res) => {
   const interviewId = req.params.interviewId as string;

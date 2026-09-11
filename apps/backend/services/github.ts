@@ -94,10 +94,6 @@ export function parseGithubInput(input: string): { username: string; repoName?: 
   return { username, repoName };
 }
 
-export function parseGithubUsername(input: string): string {
-  return parseGithubInput(input).username;
-}
-
 function getGithubHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "User-Agent": "AI-Interviewer-App",

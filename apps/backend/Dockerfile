@@ -7,7 +7,6 @@ RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /v
 # Copy package files
 COPY package.json bun.lock* ./
 COPY apps/backend/package.json ./apps/backend/
-COPY packages/ ./packages/
 
 # Install dependencies
 RUN bun install --frozen-lockfile || bun install

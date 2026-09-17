@@ -122,8 +122,8 @@ export async function runResumeParserTests() {
     parsedValidation.data.workHistory.length === 0 &&
     flexibleParsed.success &&
     flexibleParsed.data.skills.length === 4 &&
-    flexibleParsed.data.projects[0].techStack.length === 3 &&
-    flexibleParsed.data.projects[0].metrics?.includes("Improved p99")
+    flexibleParsed.data.projects[0]!.techStack.length === 3 &&
+    Boolean(flexibleParsed.data.projects[0]!.metrics?.includes("Improved p99"))
   ) {
     console.log("✅ TEST 3 STATUS: PASSED (Schema defaults and array/string unions handled cleanly)\n");
     passed++;

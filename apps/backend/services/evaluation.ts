@@ -13,6 +13,20 @@ export const EvidenceItemSchema = z.object({
   assessment: z.string().describe("Assessment of why this quote demonstrates strength or weakness"),
 });
 
+export const ResumeClaimAuditSchema = z.object({
+  claim: z.string().describe("Specific skill, project metric, or technology claim from candidate's resume"),
+  verdict: z.string().transform((val) => {
+    const upper = val.toUpperCase().trim();
+    if (upper.includes("VERIF")) return "VERIFIED" as const;
+    if (upper.includes("UNSUB") || upper.includes("EXAGG") || upper.includes("FAIL")) return "UNSUBSTANTIATED" as const;
+    return "PLAUSIBLE" as const;
+  }),
+  reasoning: z.string().describe("Explanation comparing resume claim to candidate's verbal transcript performance"),
+  quote: z.string().optional().nullable().default(null).describe("Verbatim quote from candidate demonstrating mastery or gap"),
+});
+
+export type ResumeClaimAudit = z.infer<typeof ResumeClaimAuditSchema>;
+
 export const EvaluationResultSchema = z.object({
   overallScore: z.number().min(0).max(10),
   recommendation: z.enum(["Strong Hire", "Hire", "Lean Hire", "Lean No Hire", "No Hire"]),
@@ -26,6 +40,7 @@ export const EvaluationResultSchema = z.object({
   strengths: z.array(z.string()).describe("Top 3-5 key strengths demonstrated"),
   improvements: z.array(z.string()).describe("Top 3-5 areas where the candidate should improve"),
   evidence: z.array(EvidenceItemSchema).describe("Specific quotes with analysis proving the score"),
+  claimAudits: z.array(ResumeClaimAuditSchema).optional().default([]).describe("Audit of key claims on candidate's resume vs live transcript evidence"),
   evalModel: z.string().optional().describe("Model name used to perform evaluation"),
 });
 
@@ -61,6 +76,7 @@ export async function calculateResult(
       strengths: [],
       improvements: ["Complete the interview session to receive full evaluation."],
       evidence: [],
+      claimAudits: [],
     };
 
     return {
@@ -161,6 +177,7 @@ export async function calculateResult(
       "Review interview transcript for fine-grained technical nuances.",
     ],
     evidence: [],
+    claimAudits: [],
     evalModel: "fallback",
   };
 

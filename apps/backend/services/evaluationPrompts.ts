@@ -89,7 +89,16 @@ ${transcriptFormatted}
 5. **PRINCIPLE OF ZERO PARTICIPATION PRAISE (AUTHENTIC SIGNAL ONLY)**:
    - "strengths" must contain between **0 and 3 items**.
    - NEVER invent participation praise for baseline elementary definitions (e.g. reciting standard Big-O or basic row deletion is NOT a senior strength).
-   - If the candidate failed to meet the declared bar or exhibited severe gaps, return an empty array \`[]\` or explicitly state \`["No substantial engineering strengths demonstrated at the declared ${experienceLevel} bar."]\`.
+   - If the candidate failed to meet the declared bar or exhibited severe gaps, return an empty array \`[]\` or explicitly state \`["No substantial engineering strengths demonstrated at the declared \${experienceLevel} bar."]\`.
+
+6. **PRINCIPLE OF RESUME CLAIM VERIFICATION & GROUNDING AUDIT**:
+   - If candidate resume context was provided above, audit 1 to 4 concrete claims from the resume that were **probed or discussed** during the interview (e.g. project scale, specific tools like Kafka/Redis/PostgreSQL, claimed performance metrics).
+   - **Crucial Invariant**: ONLY audit claims that were actually touched upon or probed in the dialogue. If a resume claim was NOT brought up or tested during the interview, DO NOT penalize the candidate or invent claims.
+   - For each probed claim, assign:
+     - "VERIFIED": Candidate demonstrated clear mechanical depth, trade-off awareness, and concrete implementation details substantiating their claim.
+     - "PLAUSIBLE": Candidate showed high-level conversational familiarity consistent with the claim, without deep granular internals.
+     - "UNSUBSTANTIATED": Candidate was directly questioned on the claim and fumbled basic mechanics, contradicted fundamental principles of the claimed technology, or relied purely on vague buzzwords.
+   - If no resume claims were discussed during the interview or no resume was provided, return \`"claimAudits": []\`.
 
 ---
 
@@ -221,6 +230,14 @@ Respond with ONLY a valid, parseable JSON object matching this schema:
     {
       "quote": "string (verbatim candidate quote from transcript)",
       "assessment": "string (2-sentence sharp technical assessment of why this quote demonstrates mastery or a specific gap)"
+    }
+  ],
+  "claimAudits": [
+    {
+      "claim": "string (Specific metric, skill, or architecture claim on resume)",
+      "verdict": "VERIFIED" | "PLAUSIBLE" | "UNSUBSTANTIATED",
+      "reasoning": "string (2 sentences evaluating whether dialogue substantiated this claim)",
+      "quote": "string (Optional verbatim candidate quote from transcript, or null)"
     }
   ]
 }`;

@@ -34,6 +34,7 @@ import {
   Briefcase,
   User,
   ArrowDownRight,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -52,6 +53,13 @@ interface EvidenceItem {
   assessment: string;
 }
 
+export interface ResumeClaimAudit {
+  claim: string;
+  verdict: "VERIFIED" | "PLAUSIBLE" | "UNSUBSTANTIATED";
+  reasoning: string;
+  quote?: string | null;
+}
+
 interface EvaluationData {
   overallScore: number;
   recommendation: "Strong Hire" | "Hire" | "Lean Hire" | "Lean No Hire" | "No Hire";
@@ -65,6 +73,7 @@ interface EvaluationData {
   strengths: string[];
   improvements: string[];
   evidence: EvidenceItem[];
+  claimAudits?: ResumeClaimAudit[];
   evalModel?: string;
 }
 
@@ -555,7 +564,7 @@ export function Result() {
             </div>
 
             {/* 1.5 Candidate Background & Probed Project Spotlight */}
-            {(hasResume || github) && (
+            {(hasResume || github || (evalData?.claimAudits && evalData.claimAudits.length > 0)) && (
               <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4 break-inside-avoid">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-border/40 pb-4">
                   <div className="space-y-1">
@@ -722,6 +731,98 @@ export function Result() {
                           {skill}
                         </span>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resume Claim Verification & Grounding Audit Matrix */}
+                {evalData?.claimAudits && evalData.claimAudits.length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-border/40">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="size-4 text-primary" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                          Resume Claim & Grounding Audit
+                        </span>
+                      </div>
+                      <span className="rounded-md border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground font-mono">
+                        {evalData.claimAudits.filter((c) => c.verdict === "VERIFIED").length} of {evalData.claimAudits.length} Claims Verified
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {evalData.claimAudits.map((audit, idx) => {
+                        const isVerified = audit.verdict === "VERIFIED";
+                        const isPlausible = audit.verdict === "PLAUSIBLE";
+
+                        const badgeConfig = isVerified
+                          ? {
+                              label: "VERIFIED",
+                              badgeCls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+                              borderCls: "border-emerald-500/20 bg-emerald-500/[0.03]",
+                              icon: CheckCircle2,
+                            }
+                          : isPlausible
+                          ? {
+                              label: "PLAUSIBLE",
+                              badgeCls: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+                              borderCls: "border-amber-500/20 bg-amber-500/[0.03]",
+                              icon: AlertTriangle,
+                            }
+                          : {
+                              label: "UNSUBSTANTIATED",
+                              badgeCls: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+                              borderCls: "border-rose-500/20 bg-rose-500/[0.03]",
+                              icon: AlertTriangle,
+                            };
+
+                        const StatusIcon = badgeConfig.icon;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "rounded-xl border p-3.5 space-y-2 transition-colors",
+                              badgeConfig.borderCls
+                            )}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                              <div className="space-y-0.5 min-w-0">
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+                                  Claimed on Resume
+                                </span>
+                                <p className="text-xs sm:text-sm font-medium text-foreground">
+                                  {audit.claim}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 self-start">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wide font-mono",
+                                    badgeConfig.badgeCls
+                                  )}
+                                >
+                                  <StatusIcon className="size-3" />
+                                  {badgeConfig.label}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {audit.reasoning}
+                            </p>
+
+                            {audit.quote && (
+                              <div className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/50 p-2.5 text-xs">
+                                <Quote className="size-3 text-muted-foreground shrink-0 mt-0.5" />
+                                <p className="italic text-foreground/80 font-normal">
+                                  "{audit.quote}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

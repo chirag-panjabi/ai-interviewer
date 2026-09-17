@@ -75,10 +75,15 @@ export const LiveTranscriptDrawer = React.memo(function LiveTranscriptDrawer({
 
   const handleCopyQuestion = () => {
     if (!latestAlexTurn) return;
-    navigator.clipboard.writeText(latestAlexTurn.text.trim()).then(() => {
-      setCopiedQuestion(true);
-      setTimeout(() => setCopiedQuestion(false), 2000);
-    });
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(latestAlexTurn.text.trim())
+        .then(() => {
+          setCopiedQuestion(true);
+          setTimeout(() => setCopiedQuestion(false), 2000);
+        })
+        .catch(() => {});
+    }
   };
 
   // 2. Filter turns based on search query

@@ -51,7 +51,11 @@ export function buildSystemPrompt(config: PromptConfig): string {
             .slice(0, 4)
             .map(
               (p: any) =>
-                `- ${p.name}: ${p.description || ""} (Stack: ${(p.techStack || []).join(", ") || "various"})${p.metrics ? ` [Claimed Metric: ${p.metrics}]` : ""}`
+                `- ${p.name}: ${p.description || ""} (Stack: ${(p.techStack || []).join(", ") || "various"})${
+                  p.metrics
+                    ? ` [Claimed Metric: ${Array.isArray(p.metrics) ? p.metrics.join("; ") : p.metrics}]`
+                    : ""
+                }`
             )
             .join("\n")
         : "None specifically listed";
@@ -64,8 +68,17 @@ export function buildSystemPrompt(config: PromptConfig): string {
 
       const claimedMetrics = Array.isArray(rm.projects)
         ? rm.projects
-            .filter((p: any) => p && p.metrics && typeof p.metrics === "string" && p.metrics.trim().length > 0)
-            .map((p: any) => `- "${p.metrics.trim()}" on project "${p.name}"`)
+            .map((p: any) => {
+              if (!p || !p.metrics) return null;
+              const mStr =
+                typeof p.metrics === "string"
+                  ? p.metrics.trim()
+                  : Array.isArray(p.metrics)
+                  ? p.metrics.join("; ").trim()
+                  : "";
+              return mStr ? `- "${mStr}" on project "${p.name}"` : null;
+            })
+            .filter((m: any): m is string => Boolean(m))
         : [];
       const metricsBlock = claimedMetrics.length > 0
         ? `\nHigh-Priority Quantifiable Claims to Audit (Actively cross-examine these metrics):\n${claimedMetrics.join("\n")}`

@@ -75,7 +75,7 @@ export function Interview() {
           const existingIds = new Set(prev.map((t) => t.id));
           const newFromDb = res.data.turns.filter((t: any) => !existingIds.has(t.id));
           if (newFromDb.length === 0) return prev;
-          return [...newFromDb, ...prev];
+          return [...prev, ...newFromDb].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         });
       }
     } catch {
@@ -318,6 +318,7 @@ export function Interview() {
             setStatus("live");
             setReconnectAttempt(0);
             setIsOffline(false);
+            hydrateTranscript();
           } else if (data.type === "audio" && data.pcm) {
             playerRef.current?.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
@@ -374,6 +375,7 @@ export function Interview() {
           if (data.type === "ready") {
             if (data.model) setActiveModel(data.model);
             setStatus("live");
+            hydrateTranscript();
 
             // Start dual-track session audio recording when interview goes live
             if (!sessionRecorderRef.current && recorderRef.current && playerRef.current) {

@@ -100,4 +100,34 @@ describe("PromptBuilder Resume Metric & Protocol Invariants", () => {
     expect(prompt).not.toContain("High-Priority Quantifiable Claims to Audit");
     expect(prompt).toContain("Candidate Resume Context");
   });
+
+  it("should extract and join array metrics when project metrics are provided as string[]", () => {
+    const resumeArrayMetrics = {
+      candidateName: "Eve",
+      targetRole: "Cloud Engineer",
+      skills: ["AWS", "Terraform"],
+      projects: [
+        {
+          name: "CloudInfra",
+          description: "Infrastructure scaling",
+          techStack: ["Terraform", "AWS"],
+          metrics: ["40% AWS cost reduction", "99.99% uptime SLA achieved"],
+        },
+      ],
+      workHistory: [],
+    };
+
+    const prompt = buildSystemPrompt({
+      experienceLevel: "SENIOR",
+      track: "DEVOPS",
+      candidateDisplayName: "Eve",
+      candidateProfileSummary: "Candidate: Eve",
+      hasValidRepos: false,
+      resumeMetadata: resumeArrayMetrics as any,
+    });
+
+    expect(prompt).toContain("High-Priority Quantifiable Claims to Audit");
+    expect(prompt).toContain("40% AWS cost reduction; 99.99% uptime SLA achieved");
+    expect(prompt).toContain('[Claimed Metric: 40% AWS cost reduction; 99.99% uptime SLA achieved]');
+  });
 });

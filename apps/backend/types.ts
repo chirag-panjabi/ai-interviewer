@@ -19,8 +19,18 @@ export type InterviewTrack = z.infer<typeof InterviewTrackEnum>;
 export const ResumeProjectSchema = z.object({
   name: z.string(),
   description: z.string().default(""),
-  techStack: z.array(z.string()).default([]),
-  metrics: z.string().optional(),
+  techStack: z
+    .union([
+      z.array(z.string()),
+      z.string().transform((str) => str.split(",").map((s) => s.trim()).filter(Boolean)),
+    ])
+    .default([]),
+  metrics: z
+    .union([
+      z.string(),
+      z.array(z.string()).transform((arr) => arr.join("; ")),
+    ])
+    .optional(),
 });
 export type ResumeProject = z.infer<typeof ResumeProjectSchema>;
 
@@ -28,7 +38,12 @@ export const ResumeWorkItemSchema = z.object({
   company: z.string(),
   role: z.string(),
   duration: z.string().optional(),
-  highlights: z.array(z.string()).default([]),
+  highlights: z
+    .union([
+      z.array(z.string()),
+      z.string().transform((str) => str.split("\n").map((s) => s.trim()).filter(Boolean)),
+    ])
+    .default([]),
 });
 export type ResumeWorkItem = z.infer<typeof ResumeWorkItemSchema>;
 
@@ -44,7 +59,12 @@ export const ParsedResumeSchema = z.object({
   candidateName: z.string().default("Candidate"),
   targetRole: z.string().optional(),
   yearsOfExperience: z.number().nullable().optional(),
-  skills: z.array(z.string()).default([]),
+  skills: z
+    .union([
+      z.array(z.string()),
+      z.string().transform((str) => str.split(",").map((s) => s.trim()).filter(Boolean)),
+    ])
+    .default([]),
   projects: z.array(ResumeProjectSchema).default([]),
   workHistory: z.array(ResumeWorkItemSchema).default([]),
   links: ResumeLinksSchema.default({}),

@@ -344,7 +344,20 @@ export function Result() {
 
   const recentWork = resume?.workHistory?.[0] || null;
 
-  const scrollToTranscript = () => {
+  const githubProfileUrl =
+    resume?.links?.githubUrl ||
+    (github?.username ? `https://github.com/${github.username}` : null);
+
+  const selectedRepo = github?.selectedRepo || (typeof github === "string" ? github : null);
+  const githubRepoUrl =
+    github?.username && selectedRepo
+      ? `https://github.com/${github.username}/${selectedRepo}`
+      : null;
+
+  const scrollToTranscript = (filterKeyword?: string) => {
+    if (filterKeyword) {
+      setSearchQuery(filterKeyword);
+    }
     const el = document.getElementById("transcript-section");
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -588,9 +601,9 @@ export function Result() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={scrollToTranscript}
+                      onClick={() => scrollToTranscript(selectedProjName || undefined)}
                       className="gap-1.5 rounded-lg text-xs border-border/80 bg-background/70 hover:bg-muted cursor-pointer"
-                      title="Jump to interview dialogue"
+                      title={selectedProjName ? `Jump & filter transcript to "${selectedProjName}"` : "Jump to interview dialogue"}
                     >
                       <ArrowDownRight className="size-3.5 text-primary" />
                       <span>Jump to Dialogue</span>
@@ -604,16 +617,29 @@ export function Result() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <FolderGit2 className="size-4 text-primary shrink-0" />
-                        <span className="font-semibold text-sm text-foreground truncate">
-                          {featuredResumeProj?.name || github?.selectedRepo}
-                        </span>
+                        {githubRepoUrl ? (
+                          <a
+                            href={githubRepoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-sm text-foreground truncate hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
+                            title="Open repository on GitHub"
+                          >
+                            <span className="truncate">{featuredResumeProj?.name || github?.selectedRepo}</span>
+                            <ExternalLink className="size-3 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-sm text-foreground truncate">
+                            {featuredResumeProj?.name || github?.selectedRepo}
+                          </span>
+                        )}
                         <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                           Primary Discussion Spotlight
                         </span>
                       </div>
-                      {resume?.links?.githubUrl && (
+                      {githubProfileUrl && (
                         <a
-                          href={resume.links.githubUrl}
+                          href={githubProfileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"

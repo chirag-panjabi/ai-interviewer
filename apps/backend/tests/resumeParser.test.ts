@@ -103,11 +103,32 @@ export async function runResumeParserTests() {
   };
 
   const parsedValidation = ParsedResumeSchema.safeParse(partialResumeData);
-  if (parsedValidation.success && parsedValidation.data.workHistory.length === 0) {
-    console.log("✅ TEST 3 STATUS: PASSED (Schema defaults handled partial resume cleanly)\n");
+  const flexibleMetricsData = {
+    candidateName: "Bob Smith",
+    skills: "React, TypeScript, Node.js, GraphQL",
+    projects: [
+      {
+        name: "Cloud Pipeline",
+        description: "ETL pipeline",
+        techStack: "Python, AWS, Kafka",
+        metrics: ["Improved p99 latency by 35ms", "Processed 10M records daily"],
+      },
+    ],
+  };
+  const flexibleParsed = ParsedResumeSchema.safeParse(flexibleMetricsData);
+
+  if (
+    parsedValidation.success &&
+    parsedValidation.data.workHistory.length === 0 &&
+    flexibleParsed.success &&
+    flexibleParsed.data.skills.length === 4 &&
+    flexibleParsed.data.projects[0].techStack.length === 3 &&
+    flexibleParsed.data.projects[0].metrics?.includes("Improved p99")
+  ) {
+    console.log("✅ TEST 3 STATUS: PASSED (Schema defaults and array/string unions handled cleanly)\n");
     passed++;
   } else {
-    console.error("❌ TEST 3 STATUS: FAILED (Schema rejected valid partial data)\n");
+    console.error("❌ TEST 3 STATUS: FAILED (Schema rejected valid partial/flexible data)\n");
     failed++;
   }
 

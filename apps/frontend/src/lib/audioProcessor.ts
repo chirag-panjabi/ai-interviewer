@@ -484,6 +484,7 @@ export class SessionAudioRecorder {
       const playerCtx = player.getContext();
       const AudioCtx = getAudioContextClass();
       this.audioCtx = playerCtx || (AudioCtx ? new AudioCtx() : null);
+      if (!this.audioCtx) return;
 
       if (this.audioCtx.state === "suspended") {
         this.audioCtx.resume().catch(() => {});

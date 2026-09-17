@@ -17,10 +17,13 @@ import {
   Sliders,
   Sparkles,
   ArrowRight,
+  MessageSquare,
 } from "lucide-react";
+import axios from "axios";
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
-import { getBackendWsUrl } from "../lib/config";
+import { LiveTranscriptDrawer, type TranscriptTurn } from "./LiveTranscriptDrawer";
+import { getBackendWsUrl, BACKEND_URL } from "../lib/config";
 import { getCustomApiKey } from "../lib/apiKeyStorage";
 import { LiveAudioPlayer, LiveMicrophoneRecorder, SessionAudioRecorder } from "../lib/audioProcessor";
 import { saveSessionAudio } from "../lib/audioStorage";
@@ -54,6 +57,118 @@ export function Interview() {
   const [activeModel, setActiveModel] = useState<string>("gemini-live-audio");
   const [liveCaption, setLiveCaption] = useState<LiveCaption | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+
+  // Live Transcript Drawer State
+  const [turns, setTurns] = useState<TranscriptTurn[]>([]);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  const isTranscriptOpenRef = useRef(false);
+  isTranscriptOpenRef.current = isTranscriptOpen;
+  const [unreadTurnsCount, setUnreadTurnsCount] = useState(0);
+
+  // Hydrate persisted transcript history from database
+  const hydrateTranscript = async () => {
+    if (!interviewId) return;
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/v1/transcript/${interviewId}`);
+      if (res.data?.turns && Array.isArray(res.data.turns)) {
+        setTurns((prev) => {
+          const existingIds = new Set(prev.map((t) => t.id));
+          const newFromDb = res.data.turns.filter((t: any) => !existingIds.has(t.id));
+          if (newFromDb.length === 0) return prev;
+          return [...newFromDb, ...prev];
+        });
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  };
+
+  const handleIncomingTranscript = (text: string, role: string) => {
+    const incomingSpeaker: "assistant" | "user" = role === "user" ? "user" : "assistant";
+    // 1. Maintain compact liveCaption for central subtitle
+    setLiveCaption((prev) => {
+      if (!prev || prev.speaker !== incomingSpeaker) {
+        return { speaker: incomingSpeaker, text };
+      }
+      return { speaker: incomingSpeaker, text: (prev.text + text).slice(-300) };
+    });
+
+    // 2. Incrementally build structured turns for the drawer
+    setTurns((prev) => {
+      const now = Date.now();
+      if (prev.length === 0) {
+        return [
+          {
+            id: `turn-${now}-0`,
+            speaker: incomingSpeaker,
+            text,
+            timestamp: now,
+            isStreaming: true,
+          },
+        ];
+      }
+
+      const last = prev[prev.length - 1];
+      if (last && last.speaker === incomingSpeaker && last.isStreaming) {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...last,
+          text: last.text + text,
+        };
+        return updated;
+      }
+
+      const updated = [...prev];
+      if (last && last.isStreaming) {
+        updated[updated.length - 1] = { ...last, isStreaming: false };
+      }
+
+      updated.push({
+        id: `turn-${now}-${updated.length}`,
+        speaker: incomingSpeaker,
+        text,
+        timestamp: now,
+        isStreaming: true,
+      });
+      return updated;
+    });
+  };
+
+  const handleIncomingInterrupt = () => {
+    playerRef.current?.interrupt();
+    setLiveCaption((prev) => (prev?.speaker === "assistant" ? { ...prev, text: prev.text + " [Interrupted]" } : prev));
+    setTurns((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last && last.speaker === "assistant") {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...last,
+          isStreaming: false,
+          wasInterrupted: true,
+          text: last.text.includes("[Interrupted]") ? last.text : last.text + " [Interrupted]",
+        };
+        return updated;
+      }
+      return prev;
+    });
+  };
+
+  const handleIncomingTurnComplete = () => {
+    setTurns((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last && last.isStreaming) {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...last, isStreaming: false };
+        return updated;
+      }
+      return prev;
+    });
+    if (!isTranscriptOpenRef.current) {
+      setUnreadTurnsCount((c) => c + 1);
+    }
+  };
 
   // Controls & Timer State
   const [isMuted, setIsMuted] = useState(false);
@@ -206,17 +321,12 @@ export function Interview() {
           } else if (data.type === "audio" && data.pcm) {
             playerRef.current?.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
-            playerRef.current?.interrupt();
-            setLiveCaption((prev) => (prev?.speaker === "assistant" ? { ...prev, text: prev.text + " [Interrupted]" } : prev));
+            handleIncomingInterrupt();
+          } else if (data.type === "turnComplete") {
+            handleIncomingTurnComplete();
           } else if (data.type === "transcript") {
             if (data.text) {
-              const incomingSpeaker = data.role === "user" ? "user" : "assistant";
-              setLiveCaption((prev) => {
-                if (!prev || prev.speaker !== incomingSpeaker) {
-                  return { speaker: incomingSpeaker, text: data.text };
-                }
-                return { speaker: incomingSpeaker, text: (prev.text + data.text).slice(-300) };
-              });
+              handleIncomingTranscript(data.text, data.role);
             }
           }
         } catch (err) { console.error("[Interview] Reconnect parse error:", err); }
@@ -277,17 +387,12 @@ export function Interview() {
           } else if (data.type === "audio" && data.pcm) {
             player.enqueueChunk(data.pcm);
           } else if (data.type === "interrupt") {
-            player.interrupt();
-            setLiveCaption((prev) => (prev?.speaker === "assistant" ? { ...prev, text: prev.text + " [Interrupted]" } : prev));
+            handleIncomingInterrupt();
+          } else if (data.type === "turnComplete") {
+            handleIncomingTurnComplete();
           } else if (data.type === "transcript") {
             if (data.text) {
-              const incomingSpeaker = data.role === "user" ? "user" : "assistant";
-              setLiveCaption((prev) => {
-                if (!prev || prev.speaker !== incomingSpeaker) {
-                  return { speaker: incomingSpeaker, text: data.text };
-                }
-                return { speaker: incomingSpeaker, text: (prev.text + data.text).slice(-300) };
-              });
+              handleIncomingTranscript(data.text, data.role);
             }
           } else if (data.type === "error") {
             setStatus("error");
@@ -339,17 +444,27 @@ export function Interview() {
       }
     };
 
+    hydrateTranscript();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isTranscriptOpenRef.current) {
+        setIsTranscriptOpen(false);
+      }
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("keydown", handleKeyDown);
       cleanup();
     };
-  }, []);
+  }, [interviewId]);
 
   function cleanup() {
     isEndingRef.current = true;
@@ -420,6 +535,34 @@ export function Interview() {
           {status === "live" && <><span className="h-3 w-px bg-border/60" /><span className="font-mono text-xs font-semibold tabular-nums">{formatTimer(elapsedSeconds)}</span></>}
         </div>
         <div className="flex items-center gap-2">
+          {status === "live" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsTranscriptOpen((open) => {
+                  if (!open) setUnreadTurnsCount(0);
+                  return !open;
+                });
+              }}
+              className={cn(
+                "relative rounded-lg text-xs gap-1.5 border-border/60 hover:bg-card cursor-pointer transition-colors",
+                isTranscriptOpen && "bg-primary/10 border-primary/40 text-primary"
+              )}
+              title="Toggle Live Transcript (Esc to close)"
+            >
+              <MessageSquare className="size-3.5" />
+              <span className="hidden sm:inline font-medium">Transcript</span>
+              {turns.length > 0 && (
+                <span className="font-mono text-[10px] bg-muted/80 text-foreground px-1.5 py-0.5 rounded">
+                  {turns.length}
+                </span>
+              )}
+              {unreadTurnsCount > 0 && !isTranscriptOpen && (
+                <span className="absolute -top-1 -right-1 size-2 rounded-full bg-primary animate-pulse" />
+              )}
+            </Button>
+          )}
           <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-2.5 py-1 text-xs text-muted-foreground">
             <Radio className="size-3 text-primary animate-pulse" />
             <span className="font-mono text-[11px]">{formatLiveModelName(activeModel)}</span>
@@ -427,7 +570,7 @@ export function Interview() {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
+      <div className={cn("flex flex-1 flex-col items-center justify-center px-4 py-8 transition-all duration-200", isTranscriptOpen && status === "live" && "lg:mr-[480px]")}>
         {status === "idle" && (
           <div className="w-full max-w-xl rounded-2xl border border-border/80 bg-card/60 p-8 shadow-sm backdrop-blur text-left space-y-6">
             <div className="flex items-start justify-between border-b border-border/40 pb-4">
@@ -506,6 +649,15 @@ export function Interview() {
           </div>
         )}
       </footer>
+
+      <LiveTranscriptDrawer
+        isOpen={isTranscriptOpen && status === "live"}
+        onClose={() => setIsTranscriptOpen(false)}
+        turns={turns}
+        isMuted={isMuted}
+        onToggleMute={toggleMute}
+        onEndInterview={endInterview}
+      />
     </main>
   );
 }

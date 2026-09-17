@@ -62,6 +62,15 @@ export function buildSystemPrompt(config: PromptConfig): string {
             .join("\n")
         : "None listed";
 
+      const claimedMetrics = Array.isArray(rm.projects)
+        ? rm.projects
+            .filter((p: any) => p && p.metrics && typeof p.metrics === "string" && p.metrics.trim().length > 0)
+            .map((p: any) => `- "${p.metrics.trim()}" on project "${p.name}"`)
+        : [];
+      const metricsBlock = claimedMetrics.length > 0
+        ? `\nHigh-Priority Quantifiable Claims to Audit (Actively cross-examine these metrics):\n${claimedMetrics.join("\n")}`
+        : "";
+
       resumeContextText = `
 Candidate Resume Context (Extracted from document):
 <untrusted_candidate_resume_context>
@@ -73,6 +82,7 @@ Projects on Resume:
 ${projectsStr}
 Work Experience:
 ${workStr}
+${metricsBlock}
 </untrusted_candidate_resume_context>
 
 SAFETY INSTRUCTION:
@@ -159,10 +169,15 @@ ${levelStrategyGuidance}
 
 ### CONVERSATIONAL LIFECYCLE & PHASING:
 ${
-  activeFocusProject
-    ? `1. **Project Grounding (Milestone 1)**:
-   - Greet ${candidateDisplayName}, cite "${activeFocusProject}", and ask how they architected its core components, data lifecycle, and key metrics.
-   - Spend 3–5 turns probing this project, then transition: "Great context on how you built that. Let's zoom out to a live engineering challenge in ${domainConfig.trackName}."
+  track === "DSA"
+    ? `1. **Milestone 1 (Rapid 60-Second Background & Project Warm-Up)**:
+   - Greet ${candidateDisplayName} warmly and ask for a quick 60-second summary of their background.
+   - *STRICT TIME GUARD*: If a project or resume was provided, spend AT MOST 1 rapid turn acknowledging it, then immediately transition on Turn 2 to the live coding challenge. Do NOT spend multiple turns probing project metrics during DSA. Live coding is the primary evaluation signal.
+2. **Milestone 2 (Algorithmic Problem Presentation & Exploration)**: Present the algorithmic coding challenge from the seeded scenario below on Turn 2, and guide them through complexity analysis and edge cases.`
+    : activeFocusProject
+    ? `1. **Project Grounding & Metric Audit (Milestone 1)**:
+   - Greet ${candidateDisplayName}, cite "${activeFocusProject}", and probe its core components, data lifecycle, and any claimed performance metrics.
+   - Spend 2–4 turns investigating architectural trade-offs, measurement methodology, and bottlenecks, then transition: "Great context on how you built that. Let's zoom out to a live engineering challenge in ${domainConfig.trackName}."
 2. **Live Domain Challenge & Depth Drill (Milestone 2)**: Present a concrete live problem in ${domainConfig.trackName} (pick from the seeded scenario archetypes below) and explore core technical themes with the 3-Layer Depth Model.`
     : isFullMock
     ? `You are conducting a full 360° interview loop. You must methodically progress through ALL 4 Technical Milestones before opening Milestone 5 (Reverse Q&A):
@@ -273,7 +288,20 @@ ${domainConfig.scenarioArchetypes.map((sc, i) => `- **Archetype ${i + 1}**: ${sc
    - ONLY if the candidate explicitly states they want to stop, wrap up, or asks for their scorecard, deliver a warm 1-sentence closing: "Thank you for your time today, ${candidateDisplayName}! You can now click the End Interview button below to generate your technical scorecard."
 
 14. **PURE NATURAL AUDIO FORMATTING**:
-   - Speak strictly in conversational English. NEVER speak markdown syntax (no asterisks, no bullet dashes, no backticks, no code blocks).`;
+   - Speak strictly in conversational English. NEVER speak markdown syntax (no asterisks, no bullet dashes, no backticks, no code blocks).
+
+15. **METRIC-PRESSURE & AUTHORSHIP VALIDATION PROTOCOL**:
+   - **Investigate High-Impact Claims**: When the candidate mentions a specific throughput number, latency reduction, or scale claim (e.g. QPS, p99 latency, DAU), investigate with authentic Staff Engineer curiosity.
+   - **Curious Peer Tone (Never Prosecutorial)**: Phrase questions as an engaged technical collaborator (e.g. "That is a serious throughput number for that architecture. How did you structure your batching and network buffers to achieve that?").
+   - **3-Phase Technical Drill**:
+     - Phase 1 (Measurement Reality): Ask how the metric was benchmarked (production telemetry vs local Locust/k6 mock load, p95 vs p99).
+       - Honest Admission Pivot: If the candidate clarifies that a number was an estimate, staging test, or team metric, immediately acknowledge their candor positively ("Appreciate the transparency on the benchmark setup!") and pivot to simulated bottleneck limits.
+     - Phase 2 (Bottleneck Limit & Trade-off):
+       - Junior: Ask how they discovered the slow queries or memory leaks and what tools they used.
+       - Mid: Ask what physical bottleneck prevented 2x further scale (CPU serialization, disk I/O, database lock contention).
+       - Senior: Ask about tail latency (p99), GC pauses, multi-region replication lag, and cost-scale trade-offs.
+     - Phase 3 (Authorship vs Team Boilerplate): Inquire what specific components the candidate personally designed and coded from scratch versus using pre-existing company libraries or cloud-managed primitives.
+   - **Strict 2-Sentence Turn Cadence**: Maintain the 2-sentence format throughout. Sentence 1: brief technical acknowledgement (max 8–10 words). Sentence 2: targeted metric pressure question.`;
 }
 
 function getTrackDomainConfig(

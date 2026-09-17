@@ -8,7 +8,7 @@
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A production-grade, real-time voice technical screening platform powered by Google's **Gemini Multimodal Live API** (`gemini-3.1-flash-live-preview`) and structured candidate evaluation with **`gemini-flash-latest`**.
+A production-grade, real-time voice technical screening platform powered by Google's **Gemini Multimodal Live API** (`gemini-3.8-live`) and structured candidate evaluation with **`gemini-flash-latest`**.
 
 Built with a high-performance modern full-stack architecture (**React 19**, **Bun**, **Express 5**, **PostgreSQL**, **Prisma**, **Web Audio API**), providing zero-cost, ultra-low-latency, bidirectional audio conversations with native barge-in interruptions and deep project-grounded technical probing.
 
@@ -77,7 +77,7 @@ flowchart TD
 ## ✨ Key Engineering Highlights
 
 ### 1. 🎙️ Full-Duplex Multimodal Voice Architecture
-- **Direct Audio-to-Audio Streaming**: Utilizes Google's Gemini Live API (`gemini-3.1-flash-live-preview`) over bidirectional WebSockets, bypassing traditional 3-hop cascaded pipelines (STT $\rightarrow$ LLM $\rightarrow$ TTS) to achieve sub-350ms P95 turnaround.
+- **Direct Audio-to-Audio Streaming**: Utilizes Google's Gemini Live API (`gemini-3.8-live`) over bidirectional WebSockets, bypassing traditional 3-hop cascaded pipelines (STT $\rightarrow$ LLM $\rightarrow$ TTS) to achieve sub-350ms P95 turnaround.
 - **Low-Latency Audio Pipeline**: Captures 16kHz mono Int16 PCM via Web Audio API, resamples in real time, and schedules gapless 24kHz output buffers.
 - **Client-Side Barge-In Interruption**: Continuously monitors microphone RMS energy to instantly flush and cancel queued audio buffers when the candidate speaks.
 - **Zero-Cost Dual-Track Session Recording**: Mixes candidate microphone and AI voice in the native Web Audio DSP graph with 2s timeslice streaming, dynamic codec negotiation (`.m4a` / `.webm`), EBML duration patching (crbug/642012), and IndexedDB LRU 5-session caching.
@@ -155,7 +155,7 @@ flowchart TD
   - `{"type": "ping"}` — 15s connection keep-alive.
   - `{"type": "end"}` — Clean session termination and evaluation trigger.
 - **Server $\rightarrow$ Client**:
-  - `{"type": "ready", "model": "gemini-3.1-flash-live-preview"}` — Live session established.
+  - `{"type": "ready", "model": "gemini-3.8-live"}` — Live session established.
   - `{"type": "audio", "pcm": "<base64_24khz_pcm>"}` — Synthesized interviewer voice chunks.
   - `{"type": "transcript", "role": "assistant"|"user", "text": "..."}` — Synchronized live captions.
   - `{"type": "interrupt"}` — Barge-in event clearing active audio buffers.
@@ -170,7 +170,7 @@ flowchart TD
 | **Audio Engine** | Web Audio API, `ScriptProcessorNode` / `AudioContext`, Int16/Float32 PCM pipeline, 7-band parametric EQ |
 | **Backend** | Bun runtime, Express 5, `ws` WebSocket Server, Zod validation |
 | **Database & ORM** | PostgreSQL, Prisma ORM with typed relations and cascade constraints |
-| **AI Models** | `gemini-3.1-flash-live-preview` (Voice Live API) & `gemini-flash-latest` (Structured Evaluation) |
+| **AI Models** | `gemini-3.8-live` (Voice Live API) & `gemini-flash-latest` (Structured Evaluation) |
 | **Package Management** | Turborepo, Bun workspaces |
 
 ---
@@ -211,7 +211,7 @@ DATABASE_URL="postgresql://postgres:password@localhost:5432/ai_interviewer"
 GEMINI_API_KEY="your_gemini_api_key_here"
 
 # Model Configurations (Defaults to free tier)
-GEMINI_LIVE_MODEL="gemini-3.1-flash-live-preview"
+GEMINI_LIVE_MODEL="gemini-3.8-live"
 GEMINI_EVAL_MODEL="gemini-flash-latest"
 
 # Server Ports & CORS
@@ -303,7 +303,7 @@ cd apps/frontend && bunx tsc --noEmit && bun run build
 
 ```text
 AI Technical Interviewer (Voice AI) | React 19, TypeScript, Bun, Express 5, PostgreSQL, Prisma, Web Audio API, Gemini Live API, WebSockets
-• Engineered a real-time voice technical screening platform with Gemini Live API (gemini-3.1-flash-live-preview) over WebSockets, achieving sub-350ms P95 turnaround latency without intermediate STT/TTS serialization.
+• Engineered a real-time voice technical screening platform with Gemini Live API (gemini-3.8-live) over WebSockets, achieving sub-350ms P95 turnaround latency without intermediate STT/TTS serialization.
 • Architected a Web Audio API streaming pipeline with 16kHz mono PCM capture, gapless 24kHz buffer scheduling, dual-track C++ graph session recording (.webm/.m4a) with EBML duration patching, and client-side barge-in buffer drainage.
 • Implemented a stateful conversational engine with structured 2-sentence turn cadence, adaptive depth-to-breadth probing, ASR phonetic normalization ("post grass" -> PostgreSQL), and thinking-pause detection.
 • Built a GitHub ingestion service with URL auto-detection, 10-minute TTL LRU caching, and sandboxed README context extraction across 8 specialized domain tracks.

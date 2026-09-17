@@ -77,7 +77,7 @@
       "dot": "rose",
       "title": "AI Foundation Models",
       "items": [
-        "Gemini 3.1 Flash Live with server-side VAD barge-in",
+        "Gemini 3.8 Live with server-side VAD barge-in",
         "5-model cascade fallback loop guaranteeing zero grading failure"
       ]
     }

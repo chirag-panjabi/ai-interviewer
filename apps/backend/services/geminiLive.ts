@@ -50,7 +50,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
   let graceTimeout: ReturnType<typeof setTimeout> | null = null;
   let turnSequence = 0;
   let dbWriteQueue = Promise.resolve();
-  const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview";
+  const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.8-live";
 
   function persistTurn(type: "User" | "Assistant", message: string, wasInterrupted = false) {
     const text = message.trim();

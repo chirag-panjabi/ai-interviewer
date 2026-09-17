@@ -31,6 +31,7 @@ type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "erro
 
 function formatLiveModelName(model: string): string {
   if (!model) return "Gemini Live Audio";
+  if (model === "gemini-3.8-live") return "Gemini 3.8 Live";
   if (model.includes("flash-live") || model.includes("live-preview")) return "Gemini Live Audio";
   return model.replace(/^gemini-/, "Gemini ").replace(/-/g, " ");
 }

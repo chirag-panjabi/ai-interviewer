@@ -92,7 +92,7 @@ An end-to-end multi-tier architecture mapping the client frontend, Node/Bun WebS
 - **Client Tier**: Web Audio API DSP pipeline (`audioProcessor.ts`, `AudioWorkletNode`), EBML-repaired WebM storage in IndexedDB, React 19 UI with real-time waveform visualization.
 - **Backend Tier**: Express WebSocket server (`geminiLive.ts`), GitHub intelligence parser (`github.ts`), and evaluation engine (`evaluation.ts`).
 - **Data Tier**: PostgreSQL database interfaced via Prisma Client with UUID primary keys and composite turn indexes (`[interviewId, turnIndex]`).
-- **External Services**: Gemini 3.1 Flash Live Preview (WebSockets) and Gemini 2.5 Flash (REST evaluation).
+- **External Services**: Gemini 3.8 Live (WebSockets) and Gemini Flash (gemini-flash-latest / REST evaluation).
 
 ### Guided Views Available:
 1. **End-to-End System**: Full view of all client, backend, database, and cloud components.

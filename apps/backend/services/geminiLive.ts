@@ -43,6 +43,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
   let geminiWs: WsClient | null = null;
   let isSessionActive = true;
   let isExplicitEnd = false;
+  let isHandshakeComplete = false;
   let currentAssistantTranscript = "";
   let currentUserTranscript = "";
   let audioChunkCount = 0;
@@ -293,6 +294,7 @@ ${transcriptHistory}
           // 1. Setup completed event
           if (response.setupComplete) {
             console.log(`[GeminiLive] Handshake verified (setupComplete) for ${interviewId}. Starting session...`);
+            isHandshakeComplete = true;
             
             activeClientWs.send(JSON.stringify({ type: isResumingSession ? "reconnected" : "ready", model: modelName }));
 
@@ -487,7 +489,7 @@ ${transcriptHistory}
       try {
         const msg: ClientMessage = JSON.parse(rawMsg.toString());
 
-        if (msg.type === "audio" && msg.pcm && geminiWs && geminiWs.readyState === WsClient.OPEN) {
+        if (msg.type === "audio" && msg.pcm && isHandshakeComplete && geminiWs && geminiWs.readyState === WsClient.OPEN) {
           audioChunkCount++;
           if (audioChunkCount % 50 === 1) {
             console.log(`[GeminiLive] Streaming mic audio chunk #${audioChunkCount} (${interviewId})`);

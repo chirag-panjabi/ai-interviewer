@@ -265,12 +265,13 @@ export function Interview() {
     }
     const recorder = new LiveMicrophoneRecorder((pcm) => {
       const ws = socketRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN && !isMutedRef.current) {
-        // Acoustic Echo Gate: When Alex is actively speaking, ignore quiet laptop speaker bleed (< 0.08 RMS).
-        // If candidate speaks up to interrupt (> 0.08 RMS), forward audio immediately for barge-in.
+      // Gate microphone: only stream when socket is open, not muted, and the interview session is live
+      if (ws && ws.readyState === WebSocket.OPEN && !isMutedRef.current && statusRef.current === "live") {
+        // Acoustic Echo Gate: When Alex is actively speaking, ignore quiet laptop speaker bleed.
+        // If candidate speaks up to interrupt (> 0.22 RMS volume), forward audio immediately for barge-in.
         if (playerRef.current?.isPlaying()) {
-          const micVol = recorderRef.current?.getVolumeLevel() || 0;
-          if (micVol < 0.08) {
+          const micVol = recorder.getVolumeLevel();
+          if (micVol < 0.22) {
             return;
           }
         }
@@ -349,6 +350,17 @@ export function Interview() {
       setErrorMessage(null);
       const streamToTransfer = testStreamRef.current;
       stopMicTest(true);
+
+      // Clean up previous audio player and socket instances if any existed
+      if (playerRef.current) {
+        playerRef.current.close();
+        playerRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+
       const player = new LiveAudioPlayer();
       player.warmUp();
       await player.resume();

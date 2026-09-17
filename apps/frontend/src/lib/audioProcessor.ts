@@ -26,10 +26,10 @@ export class LiveAudioPlayer {
   private activeSources: AudioBufferSourceNode[] = [];
   private remainderByte: number | null = null;
 
-  // 180ms buffer headway absorbs packet arrival jitter and prevents audio underruns between streaming words
-  private static readonly JITTER_BUFFER_SECS = 0.18;
-  // Prevent excessive latency buildup if server pushes chunks in a fast burst
-  private static readonly MAX_AHEAD_SECS = 0.80;
+  // 150ms buffer headway absorbs packet arrival jitter and prevents audio underruns between streaming words
+  private static readonly JITTER_BUFFER_SECS = 0.15;
+  // Threshold to distinguish between true pause/new turn (> 80ms) and JS event-loop micro-jitter (<= 80ms)
+  private static readonly GAP_THRESHOLD_SECS = 0.08;
 
   constructor() {
     // Lazy init or warm up on user gesture
@@ -77,7 +77,7 @@ export class LiveAudioPlayer {
       source.connect(this.masterGainNode || this.ctx.destination);
       source.start(0);
 
-      this.nextPlayTime = this.ctx.currentTime;
+      this.nextPlayTime = 0;
       console.log("[LiveAudioPlayer] Warmed up AudioContext. State:", this.ctx.state, "SampleRate:", this.ctx.sampleRate);
     } catch (e) {
       console.warn("[LiveAudioPlayer] Warm-up error:", e);
@@ -116,7 +116,7 @@ export class LiveAudioPlayer {
 
   public isPlaying(): boolean {
     if (!this.ctx) return false;
-    return this.nextPlayTime > this.ctx.currentTime;
+    return this.nextPlayTime > this.ctx.currentTime || this.activeSources.length > 0;
   }
 
   public enqueueChunk(base64Pcm: string, sampleRate = 24000): void {
@@ -182,13 +182,17 @@ export class LiveAudioPlayer {
       }
 
       const now = ctx.currentTime;
-      // If queue ran dry (underrun) or this is the first chunk of a turn,
-      // prime a 180ms jitter buffer headway so subsequent packets queue up before audio starts
-      if (this.nextPlayTime < now) {
-        this.nextPlayTime = now + LiveAudioPlayer.JITTER_BUFFER_SECS;
-      } else if (this.nextPlayTime > now + LiveAudioPlayer.MAX_AHEAD_SECS) {
-        // Clamp runaway ahead time
-        this.nextPlayTime = now + LiveAudioPlayer.MAX_AHEAD_SECS;
+      // If queue is idle/initial (nextPlayTime === 0) or ran dry (underrun):
+      // - Initial turn start or genuine underrun (> 80ms gap): prime 150ms jitter buffer
+      // - Micro-jitter (<= 80ms gap): schedule immediately at now with zero stutter
+      // NEVER clamp nextPlayTime backwards: that causes newer audio to play concurrently
+      // on top of uncompleted earlier buffers, creating overlapping voices.
+      if (this.nextPlayTime === 0 || this.nextPlayTime < now) {
+        if (this.nextPlayTime === 0 || now - this.nextPlayTime > LiveAudioPlayer.GAP_THRESHOLD_SECS) {
+          this.nextPlayTime = now + LiveAudioPlayer.JITTER_BUFFER_SECS;
+        } else {
+          this.nextPlayTime = now;
+        }
       }
 
       const startTime = this.nextPlayTime;
@@ -252,6 +256,7 @@ export class LiveAudioPlayer {
       this.ctx.close().catch(() => {});
       this.ctx = null;
     }
+    this.nextPlayTime = 0;
   }
 }
 

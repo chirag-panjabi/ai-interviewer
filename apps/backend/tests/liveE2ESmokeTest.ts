@@ -2,7 +2,7 @@ import axios from "axios";
 import { config } from "../config";
 import { buildSystemPrompt } from "../services/promptBuilder";
 import { calculateResult } from "../services/evaluation";
-import { ParsedResume } from "../types";
+import type { ParsedResume } from "../types";
 
 async function callGemini(
   systemPrompt: string,
@@ -58,7 +58,7 @@ export async function runLiveE2ESmokeTest() {
 
   const sampleResume: ParsedResume = {
     candidateName: "Chirag Panjabi",
-    githubUsername: "chirag-panjabi",
+    links: { githubUsername: "chirag-panjabi" },
     skills: ["Go", "Kafka", "ClickHouse", "Distributed Systems", "Kubernetes"],
     projects: [
       {
@@ -66,7 +66,6 @@ export async function runLiveE2ESmokeTest() {
         description: "Real-time distributed telemetry ingestion and analytics pipeline",
         techStack: ["Go", "Kafka", "ClickHouse", "Docker"],
         metrics: "85,000 QPS with p99 latency < 25ms, reduced memory footprint by 40% with zero-copy ring buffers",
-        repoUrl: "https://github.com/chirag-panjabi/stream-pulse",
       },
       {
         name: "Pragna",
@@ -75,7 +74,7 @@ export async function runLiveE2ESmokeTest() {
         metrics: "Sub-16ms render times on 10,000 data points",
       },
     ],
-    workExperience: [
+    workHistory: [
       {
         company: "Apex Distributed Labs",
         role: "Senior Systems Engineer",
@@ -99,7 +98,7 @@ export async function runLiveE2ESmokeTest() {
     candidateProfileSummary: "Candidate: Chirag (SENIOR). Projects: StreamPulse (Go / Kafka / 85,000 QPS), Pragna (React UI).",
     hasValidRepos: true,
     resumeMetadata: sampleResume,
-    focusProject: "StreamPulse",
+    selectedResumeProject: "StreamPulse",
   });
 
   console.log(`   System Prompt Length: ${systemPrompt.length} chars`);

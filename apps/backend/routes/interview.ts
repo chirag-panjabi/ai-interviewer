@@ -282,3 +282,51 @@ function sanitizeJson<T = any>(val: any): T | null {
     res.status(500).json({ message: "Evaluation failed", error: err?.message || "Unknown error" });
   }
 });
+
+// 4. Fetch live / historical transcript for an interview session
+const getTranscriptHandler = async (req: any, res: any) => {
+  const interviewId = req.params.interviewId as string;
+  if (!interviewId) {
+    res.status(400).json({ error: "interviewId is required" });
+    return;
+  }
+
+  try {
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId },
+      select: { id: true, status: true },
+    });
+
+    if (!interview) {
+      res.status(404).json({ error: "Interview not found" });
+      return;
+    }
+
+    const messages = await prisma.message.findMany({
+      where: { interviewId },
+      orderBy: [
+        { turnIndex: "asc" },
+        { createdAt: "asc" },
+      ],
+    });
+
+    res.json({
+      interviewId,
+      status: interview.status,
+      turns: messages.map((m) => ({
+        id: m.id,
+        speaker: m.type === "Assistant" ? ("assistant" as const) : ("user" as const),
+        text: m.message,
+        turnIndex: m.turnIndex,
+        wasInterrupted: m.wasInterrupted,
+        timestamp: new Date(m.createdAt).getTime(),
+      })),
+    });
+  } catch (err: any) {
+    console.error(`[Transcript] Error fetching transcript for ${interviewId}:`, err?.message || err);
+    res.status(500).json({ error: "Failed to fetch interview transcript" });
+  }
+};
+
+interviewRouter.get("/interview/:interviewId/transcript", getTranscriptHandler);
+interviewRouter.get("/transcript/:interviewId", getTranscriptHandler);

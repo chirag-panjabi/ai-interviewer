@@ -182,16 +182,21 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       createdAt: c.createdAt,
     }));
 
+// Recursive JSON sanitizer to safely unpack raw JSON objects, stringified JSON, or double-stringified JSON
+function sanitizeJson<T = any>(val: any): T | null {
+  if (!val) return null;
+  if (typeof val === "object") return val as T;
+  try {
+    const parsed = JSON.parse(val);
+    return typeof parsed === "string" ? JSON.parse(parsed) : (parsed as T);
+  } catch {
+    return null;
+  }
+}
+
     // If already evaluated, return immediately
     if (interview.status === "COMPLETED") {
-      let parsedEvaluation = interview.evaluationData;
-      if (typeof parsedEvaluation === "string") {
-        try {
-          parsedEvaluation = JSON.parse(parsedEvaluation);
-        } catch {
-          // ignore
-        }
-      }
+      const parsedEvaluation = sanitizeJson(interview.evaluationData);
 
       res.json({
         id: interview.id,
@@ -200,6 +205,9 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
         evaluationData: parsedEvaluation,
         experienceLevel: interview.experienceLevel,
         track: interview.track,
+        resumeMetadata: sanitizeJson(interview.resumeMetadata),
+        selectedResumeProject: interview.selectedResumeProject || null,
+        githubMetadata: sanitizeJson(interview.githubMetadata),
         transcript,
         status: "COMPLETED",
       });
@@ -214,6 +222,9 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
         message: "Evaluation is currently in progress...",
         experienceLevel: interview.experienceLevel,
         track: interview.track,
+        resumeMetadata: sanitizeJson(interview.resumeMetadata),
+        selectedResumeProject: interview.selectedResumeProject || null,
+        githubMetadata: sanitizeJson(interview.githubMetadata),
         transcript,
       });
       return;
@@ -254,6 +265,9 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       evaluationData: result.evaluationData,
       experienceLevel: updated.experienceLevel,
       track: updated.track,
+      resumeMetadata: sanitizeJson(updated.resumeMetadata),
+      selectedResumeProject: updated.selectedResumeProject || null,
+      githubMetadata: sanitizeJson(updated.githubMetadata),
       transcript,
       status: "COMPLETED",
     });

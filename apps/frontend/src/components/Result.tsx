@@ -27,12 +27,20 @@ import {
   Play,
   Pause,
   Headphones,
+  Github,
+  ExternalLink,
+  Target,
+  FolderGit2,
+  Briefcase,
+  User,
+  ArrowDownRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { getSessionAudio, type SessionAudioResult } from "../lib/audioStorage";
 import { cn } from "../lib/utils";
+import type { ParsedResume } from "../types";
 
 interface CategoryScore {
   score: number;
@@ -75,6 +83,9 @@ interface ResultData {
     createdAt: string;
   }[];
   status: string;
+  resumeMetadata?: ParsedResume | null;
+  selectedResumeProject?: string | null;
+  githubMetadata?: any;
 }
 
 const TRACK_LABELS: Record<string, string> = {
@@ -312,6 +323,32 @@ export function Result() {
   const isDSA = result.track === "DSA";
   const isFullMock = result.track === "FULL_MOCK_SCREEN";
 
+  const resume = result?.resumeMetadata || null;
+  const hasResume = !!resume;
+  const github = result?.githubMetadata || null;
+  const candidateName =
+    resume?.candidateName?.trim() && resume.candidateName !== "Candidate"
+      ? resume.candidateName.slice(0, 60)
+      : github?.username
+      ? `@${github.username}`
+      : null;
+
+  const selectedProjName =
+    result?.selectedResumeProject ||
+    (typeof github === "object" ? github?.selectedRepo : null);
+
+  const featuredResumeProj =
+    resume?.projects?.find((p) => p.name === selectedProjName) ||
+    resume?.projects?.[0] ||
+    null;
+
+  const recentWork = resume?.workHistory?.[0] || null;
+
+  const scrollToTranscript = () => {
+    const el = document.getElementById("transcript-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const categoriesConfig = [
     {
       key: "technicalAccuracy" as const,
@@ -360,7 +397,7 @@ export function Result() {
               <ArrowLeft className="size-4" />
             </Button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-semibold tracking-wider text-foreground">
                   EVALUATION DOSSIER
                 </span>
@@ -369,10 +406,23 @@ export function Result() {
                     {levelLabel} · {trackLabel}
                   </span>
                 )}
+                {hasResume && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <FileText className="size-3" />
+                    Resume Verified
+                  </span>
+                )}
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Evaluated via <span className="font-medium text-foreground">{modelDisplayName}</span> rubric
-              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                {candidateName && (
+                  <span className="font-medium text-foreground">
+                    Candidate: {candidateName} ·
+                  </span>
+                )}
+                <span>
+                  Evaluated via <span className="font-medium text-foreground">{modelDisplayName}</span> rubric
+                </span>
+              </div>
             </div>
           </div>
 
@@ -490,6 +540,167 @@ export function Result() {
                 </p>
               </div>
             </div>
+
+            {/* 1.5 Candidate Background & Probed Project Spotlight */}
+            {(hasResume || github) && (
+              <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4 break-inside-avoid">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-border/40 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <FileText className="size-3.5 text-primary" />
+                        Candidate Background & Probed Spotlight
+                      </span>
+                      {hasResume ? (
+                        <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                          Verified Resume
+                        </span>
+                      ) : (
+                        <span className="rounded-md border border-border/60 bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                          <Github className="size-3" />
+                          GitHub Synced
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground pt-0.5">
+                      {candidateName && (
+                        <span className="font-semibold text-foreground flex items-center gap-1">
+                          <User className="size-3 text-muted-foreground" />
+                          {candidateName}
+                        </span>
+                      )}
+                      {recentWork && (
+                        <span className="flex items-center gap-1">
+                          <Briefcase className="size-3 text-muted-foreground" />
+                          {recentWork.role} at {recentWork.company}
+                          {recentWork.duration && ` (${recentWork.duration})`}
+                        </span>
+                      )}
+                      {resume?.yearsOfExperience != null && (
+                        <span className="rounded border border-border/50 bg-background/40 px-1.5 py-0.2 text-[10px] font-mono">
+                          {resume.yearsOfExperience}+ yrs exp
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2" data-no-print>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={scrollToTranscript}
+                      className="gap-1.5 rounded-lg text-xs border-border/80 bg-background/70 hover:bg-muted cursor-pointer"
+                      title="Jump to interview dialogue"
+                    >
+                      <ArrowDownRight className="size-3.5 text-primary" />
+                      <span>Jump to Dialogue</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Probed Project Spotlight Card */}
+                {(featuredResumeProj || github?.selectedRepo) && (
+                  <div className="rounded-xl border border-border/70 bg-background/60 p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FolderGit2 className="size-4 text-primary shrink-0" />
+                        <span className="font-semibold text-sm text-foreground truncate">
+                          {featuredResumeProj?.name || github?.selectedRepo}
+                        </span>
+                        <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                          Primary Discussion Spotlight
+                        </span>
+                      </div>
+                      {resume?.links?.githubUrl && (
+                        <a
+                          href={resume.links.githubUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                          data-no-print
+                        >
+                          <Github className="size-3.5" />
+                          <span>Candidate GitHub</span>
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    {featuredResumeProj?.description && (
+                      <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed line-clamp-3">
+                        {featuredResumeProj.description}
+                      </p>
+                    )}
+
+                    {/* Claimed Key Metric */}
+                    {featuredResumeProj?.metrics && (
+                      <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs">
+                        <Target className="size-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <span className="font-medium text-emerald-500 block text-[11px] uppercase tracking-wide">
+                            Claimed Impact Metric Probed
+                          </span>
+                          <p className="text-foreground/90 font-mono text-xs line-clamp-2">
+                            {featuredResumeProj.metrics}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tech Stack */}
+                    {featuredResumeProj?.techStack && featuredResumeProj.techStack.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[11px] font-mono text-muted-foreground mr-1">
+                          Stack:
+                        </span>
+                        {featuredResumeProj.techStack.slice(0, 8).map((tech, idx) => (
+                          <span
+                            key={idx}
+                            className="rounded-md border border-border/50 bg-secondary/40 px-2 py-0.5 text-[10px] font-mono text-muted-foreground"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Skills & Other Projects */}
+                {resume?.skills && resume.skills.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Verified Skills & Tools ({resume.skills.length})
+                      </span>
+                      {resume.projects && resume.projects.length > 1 && (
+                        <span className="text-[11px] text-muted-foreground">
+                          Additional projects on resume:{" "}
+                          <span className="text-foreground font-medium">
+                            {resume.projects
+                              .filter((p) => p.name !== featuredResumeProj?.name)
+                              .map((p) => p.name)
+                              .slice(0, 2)
+                              .join(", ")}
+                            {resume.projects.length > 3 && " ..."}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {resume.skills.slice(0, 16).map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-md border border-border/60 bg-background/50 px-2 py-0.5 text-[11px] text-foreground/80"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 2. 4-Pillar Engineering Rubric (Unified Competency Grid) */}
             {evalData?.categories && (
@@ -744,7 +955,7 @@ export function Result() {
             )}
 
             {/* 6. Full Audio Transcript */}
-            <div className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4">
+            <div id="transcript-section" className="rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/40 pb-4">
                 <div>
                   <span className="text-xs font-semibold text-foreground block">

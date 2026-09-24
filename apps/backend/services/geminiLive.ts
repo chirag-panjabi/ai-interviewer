@@ -124,12 +124,24 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
 
           if (Array.isArray(meta.repos) && meta.repos.length > 0) {
             hasValidRepos = true;
-            const reposList = meta.repos
+
+            // If candidate explicitly chose a repo, place it first in the list
+            const sortedRepos = [...meta.repos];
+            const activeTargetRepo = chosenRepoName;
+            if (activeTargetRepo) {
+              const idx = sortedRepos.findIndex((r: any) => r.name.toLowerCase() === activeTargetRepo.toLowerCase());
+              if (idx > 0) {
+                const [target] = sortedRepos.splice(idx, 1);
+                if (target) sortedRepos.unshift(target);
+              }
+            }
+
+            const reposList = sortedRepos
               .slice(0, 8)
               .map((r: any) => {
                 let text = `- ${r.name} (${r.language || "General"}): ${r.description || "No description"} [Topics: ${(r.topics || []).join(", ") || "none"}]`;
                 if (r.readme) {
-                  text += `\n  README Summary: ${r.readme.slice(0, 400).replace(/\n+/g, " ")}...`;
+                  text += `\n  <untrusted_candidate_repo_context>\n  README: ${r.readme.slice(0, 600).replace(/\n+/g, " ")}...\n  </untrusted_candidate_repo_context>`;
                 }
                 return text;
               })
@@ -138,7 +150,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string, cust
             candidateProfileSummary = `Candidate Username: ${meta.username || "Candidate"}
 Candidate Spoken Name: ${candidateDisplayName}
 Bio: ${meta.bio || "None provided"}
-${chosenRepoName ? `Target Selected Repository for In-Depth Discussion: "${chosenRepoName}"\n` : ""}Public Repositories:
+${chosenRepoName ? `Candidate Explicitly Selected Flagship Project: "${chosenRepoName}"\n` : ""}Public Repositories:
 ${reposList}`;
           }
         } catch {
@@ -238,7 +250,7 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
             activeClientWs.send(JSON.stringify({ type: "ready", model: modelName }));
 
             const openingTurnText = chosenRepoName
-              ? `Hello Alex! I am ready for the technical screen. I would like to focus on my project "${chosenRepoName}". Please introduce yourself and ask your first question.`
+              ? `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question based on my featured GitHub project "${chosenRepoName}".`
               : hasValidRepos
               ? `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
               : `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question.`;

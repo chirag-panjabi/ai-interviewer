@@ -85,16 +85,31 @@ interviewRouter.post("/github-preview", async (req, res) => {
   }
 });
 
+// Recursive JSON sanitizer to safely unpack raw JSON objects, stringified JSON, or double-stringified JSON
+function sanitizeJson<T = any>(val: any): T | null {
+  if (!val) return null;
+  if (typeof val === "object") return val as T;
+  try {
+    const parsed = JSON.parse(val);
+    return typeof parsed === "string" ? JSON.parse(parsed) : (parsed as T);
+  } catch {
+    return null;
+  }
+}
+
 // 3. Ingest GitHub profile & selected project, initialize interview (Rate limited to 15 / day / IP for hosted demo tier)
 interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
-  const { success, data } = PreInterviewBody.safeParse(req.body);
+  const parseResult = PreInterviewBody.safeParse(req.body);
 
-  if (!success) {
+  if (!parseResult.success) {
+    const errorDetails = parseResult.error.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join(", ");
     res.status(400).json({
-      message: "Invalid request body. Expected { github: string, selectedRepo?: string }.",
+      message: `Invalid request parameters (${errorDetails}).`,
     });
     return;
   }
+
+  const data = parseResult.data;
 
   try {
     const githubData = await scrapeGithub(data.github, data.selectedRepo);
@@ -159,20 +174,14 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
 
     // If already evaluated, return immediately
     if (interview.status === "COMPLETED") {
-      let parsedEvaluation = interview.evaluationData;
-      if (typeof parsedEvaluation === "string") {
-        try {
-          parsedEvaluation = JSON.parse(parsedEvaluation);
-        } catch {
-          // ignore
-        }
-      }
+      const parsedEvaluation = sanitizeJson(interview.evaluationData);
 
       res.json({
         id: interview.id,
         score: interview.score,
         feedback: interview.feedback,
         evaluationData: parsedEvaluation,
+        githubMetadata: sanitizeJson(interview.githubMetadata),
         transcript,
         status: "COMPLETED",
       });
@@ -185,6 +194,7 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
         id: interview.id,
         status: "EVALUATING",
         message: "Evaluation is currently in progress...",
+        githubMetadata: sanitizeJson(interview.githubMetadata),
         transcript,
       });
       return;
@@ -216,6 +226,7 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       score: updated.score,
       feedback: updated.feedback,
       evaluationData: result.evaluationData,
+      githubMetadata: sanitizeJson(updated.githubMetadata),
       transcript,
       status: "COMPLETED",
     });

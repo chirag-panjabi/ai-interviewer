@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { toast } from "sonner";
 import axios from "axios";
-import { BACKEND_URL } from "@/lib/config";
+import { BACKEND_URL } from "../lib/config";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -23,9 +23,9 @@ import {
   AlertCircle,
   User,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 import { ApiKeyModal } from "./ApiKeyModal";
-import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "@/lib/apiKeyStorage";
+import { getCustomApiKey, hasCustomApiKey, maskApiKey } from "../lib/apiKeyStorage";
 
 const LOADING_STEPS = [
   "Fetching GitHub profile & public repositories...",

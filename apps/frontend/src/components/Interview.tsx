@@ -3,10 +3,10 @@ import { useNavigate, useParams } from "react-router";
 import { Bot, Loader2, PhoneOff, User, Mic, MicOff, AlertCircle, Play, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
-import { getBackendWsUrl } from "@/lib/config";
-import { getCustomApiKey } from "@/lib/apiKeyStorage";
-import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
-import { cn } from "@/lib/utils";
+import { getBackendWsUrl } from "../lib/config";
+import { getCustomApiKey } from "../lib/apiKeyStorage";
+import { LiveAudioPlayer, LiveMicrophoneRecorder } from "../lib/audioProcessor";
+import { cn } from "../lib/utils";
 
 type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "error";
 

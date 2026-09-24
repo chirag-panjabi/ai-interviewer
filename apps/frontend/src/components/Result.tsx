@@ -1,5 +1,5 @@
-import { BACKEND_URL } from "@/lib/config";
-import { getCustomApiKey } from "@/lib/apiKeyStorage";
+import { BACKEND_URL } from "../lib/config";
+import { getCustomApiKey } from "../lib/apiKeyStorage";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -20,11 +20,14 @@ import {
   Download,
   Search,
   Check,
+  Github,
+  FolderGit2,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface CategoryScore {
   score: number;
@@ -52,11 +55,27 @@ interface EvaluationData {
   evalModel?: string;
 }
 
+interface GithubMetadata {
+  username?: string;
+  name?: string;
+  bio?: string;
+  selectedRepo?: string;
+  avatarUrl?: string;
+  repos?: Array<{
+    name: string;
+    description?: string;
+    language?: string;
+    stars?: number;
+    topics?: string[];
+  }>;
+}
+
 interface ResultData {
   id?: string;
   score: number;
   feedback: string;
   evaluationData?: EvaluationData;
+  githubMetadata?: GithubMetadata | null;
   transcript: { type: "Assistant" | "User"; content: string; createdAt: string }[];
   status: string;
 }
@@ -293,6 +312,87 @@ export function Result() {
                 {evalData?.summary || result.feedback}
               </p>
             </div>
+
+            {/* Candidate & Project Context Header */}
+            {result.githubMetadata && (
+              <div className="mt-4 rounded-xl border border-border/60 bg-background/50 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <User className="size-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm text-foreground">
+                      {result.githubMetadata.name || result.githubMetadata.username || "Candidate"}
+                    </span>
+                    {result.githubMetadata.username && (
+                      <a
+                        href={`https://github.com/${result.githubMetadata.username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        data-no-print
+                      >
+                        <Github className="size-3.5" />
+                        <span>@{result.githubMetadata.username}</span>
+                        <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                  </div>
+
+                  {result.githubMetadata.selectedRepo && (
+                    <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary flex items-center gap-1">
+                        <FolderGit2 className="size-3" />
+                        <span>Project Focus: {result.githubMetadata.selectedRepo}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {result.githubMetadata.selectedRepo && (() => {
+                  const repoName = result.githubMetadata.selectedRepo;
+                  const activeRepo = result.githubMetadata.repos?.find(
+                    (r) => r.name.toLowerCase() === repoName.toLowerCase()
+                  );
+                  return (
+                    <div className="rounded-lg border border-border/40 bg-card/40 p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FolderGit2 className="size-3.5 text-primary" />
+                          {result.githubMetadata.username ? (
+                            <a
+                              href={`https://github.com/${result.githubMetadata.username}/${repoName}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-xs text-foreground hover:underline inline-flex items-center gap-1"
+                              data-no-print
+                            >
+                              <span>{repoName}</span>
+                              <ExternalLink className="size-2.5 text-muted-foreground" />
+                            </a>
+                          ) : (
+                            <span className="font-medium text-xs text-foreground">{repoName}</span>
+                          )}
+                          {activeRepo?.language && (
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              • {activeRepo.language}
+                            </span>
+                          )}
+                        </div>
+                        {activeRepo?.stars != null && activeRepo.stars > 0 && (
+                          <span className="text-[11px] text-muted-foreground font-mono">
+                            ★ {activeRepo.stars}
+                          </span>
+                        )}
+                      </div>
+                      {activeRepo?.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {activeRepo.description}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </section>
 
           {/* 4 Category Score Cards */}

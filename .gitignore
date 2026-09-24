@@ -39,4 +39,7 @@ yarn-error.log*
 
 # Local Documentation & Prep Guides (untracked)
 docs/
+docs-original-all-features/
+docs-interview-prep/
 explained-codebase/
+

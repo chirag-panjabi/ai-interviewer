@@ -4,18 +4,15 @@ function getBackendUrl(): string {
     return (window as any).__ENV__.BACKEND_URL;
   }
 
-  // 2. Safely check process.env if defined
-  try {
-    if (typeof process !== "undefined" && process?.env) {
-      const url =
-        process.env.BUN_PUBLIC_BACKEND_URL ||
-        process.env.VITE_BACKEND_URL ||
-        process.env.NEXT_PUBLIC_BACKEND_URL ||
-        process.env.BACKEND_URL;
-      if (url) return url;
-    }
-  } catch {
-    // ignore in browser
+  // 2. Safely check process.env via globalThis (never throws ReferenceError in browser)
+  const gProcess = (globalThis as any).process;
+  if (gProcess && gProcess.env) {
+    const url =
+      gProcess.env.BUN_PUBLIC_BACKEND_URL ||
+      gProcess.env.VITE_BACKEND_URL ||
+      gProcess.env.NEXT_PUBLIC_BACKEND_URL ||
+      gProcess.env.BACKEND_URL;
+    if (url) return url;
   }
 
   // 3. Check import.meta.env if available

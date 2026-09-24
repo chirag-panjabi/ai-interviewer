@@ -40,7 +40,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
   let audioChunkCount = 0;
   let activeClientWs = clientWs;
   let graceTimeout: ReturnType<typeof setTimeout> | null = null;
-  const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview";
+  const modelName = config.GEMINI_LIVE_MODEL || "gemini-3.8-live";
 
   const sessionObj: ActiveSession = {
     interviewId,
@@ -323,6 +323,7 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
             // D. Barge-in / Interruption
             if (serverContent.interrupted) {
               console.log(`[GeminiLive] Interruption detected for interview: ${interviewId}`);
+              currentAssistantTranscript = "";
               try {
                 activeClientWs.send(JSON.stringify({ type: "interrupt" }));
               } catch (e) {}
@@ -362,11 +363,19 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
       geminiWs.on("close", (code, reason) => {
         console.log(`[GeminiLive] Gemini WS Closed (${interviewId}): ${code} - ${reason.toString()}`);
         cleanup();
+        try {
+          if (activeClientWs.readyState === WsClient.OPEN && !isExplicitEnd) {
+            activeClientWs.close(4000, "Upstream Gemini session closed");
+          }
+        } catch (e) {}
       });
     } catch (err: any) {
       console.error("[GeminiLive] Init error:", err);
       try {
-        activeClientWs.send(JSON.stringify({ type: "error", message: err.message }));
+        if (activeClientWs.readyState === WsClient.OPEN) {
+          activeClientWs.send(JSON.stringify({ type: "error", message: err.message }));
+          activeClientWs.close(4002, "Init error");
+        }
       } catch (e) {}
       cleanup();
     }

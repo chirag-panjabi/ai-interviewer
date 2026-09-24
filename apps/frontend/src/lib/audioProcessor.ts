@@ -4,14 +4,32 @@
  * - Browser Autoplay & User-Gesture warm-up
  * - Low latency microphone streaming at 16kHz mono Int16 PCM
  * - Real-time VoiceOrb RMS meter
+ * - Dual-track SessionAudioRecorder mixing candidate mic + AI interviewer with zero JS GC overhead
  */
+
+function getAudioContextClass(): typeof AudioContext | null {
+  if (typeof window !== "undefined") {
+    return window.AudioContext || (window as any).webkitAudioContext || null;
+  }
+  if (typeof globalThis !== "undefined" && (globalThis as any).AudioContext) {
+    return (globalThis as any).AudioContext;
+  }
+  return null;
+}
 
 export class LiveAudioPlayer {
   private ctx: AudioContext | null = null;
+  private masterGainNode: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private analyserData: Uint8Array | null = null;
   private nextPlayTime = 0;
   private activeSources: AudioBufferSourceNode[] = [];
+  private remainderByte: number | null = null;
+
+  // 150ms buffer headway absorbs packet arrival jitter and prevents audio underruns between streaming words
+  private static readonly JITTER_BUFFER_SECS = 0.15;
+  // Threshold to distinguish between true pause/new turn (> 80ms) and JS event-loop micro-jitter (<= 80ms)
+  private static readonly GAP_THRESHOLD_SECS = 0.08;
 
   constructor() {
     // Lazy init or warm up on user gesture
@@ -19,32 +37,59 @@ export class LiveAudioPlayer {
 
   public warmUp(): void {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = getAudioContextClass();
+      if (!AudioCtx) return;
+
       if (!this.ctx || this.ctx.state === "closed") {
-        this.ctx = new AudioCtx({ sampleRate: 24000 });
+        try {
+          this.ctx = new AudioCtx({ sampleRate: 24000 });
+        } catch {
+          // Safari WebKit does not allow custom sampleRate on new AudioContext
+          this.ctx = new AudioCtx();
+        }
+
+        this.masterGainNode = this.ctx.createGain();
+        this.masterGainNode.gain.value = 1.0;
+        this.masterGainNode.connect(this.ctx.destination);
+
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 256;
         this.analyser.smoothingTimeConstant = 0.8;
         this.analyserData = new Uint8Array(this.analyser.fftSize);
-        this.analyser.connect(this.ctx.destination);
+        this.masterGainNode.connect(this.analyser);
       }
 
       if (this.ctx.state === "suspended") {
         this.ctx.resume().catch(() => {});
       }
 
+      this.ctx.onstatechange = () => {
+        if (this.ctx && this.ctx.state === "suspended") {
+          console.log("[LiveAudioPlayer] Context suspended by browser. Auto-resuming...");
+          this.ctx.resume().catch(() => {});
+        }
+      };
+
       // Play 1ms silent buffer to unlock hardware output
       const silentBuffer = this.ctx.createBuffer(1, 24, 24000);
       const source = this.ctx.createBufferSource();
       source.buffer = silentBuffer;
-      source.connect(this.ctx.destination);
+      source.connect(this.masterGainNode || this.ctx.destination);
       source.start(0);
 
-      this.nextPlayTime = this.ctx.currentTime;
+      this.nextPlayTime = 0;
       console.log("[LiveAudioPlayer] Warmed up AudioContext. State:", this.ctx.state, "SampleRate:", this.ctx.sampleRate);
     } catch (e) {
       console.warn("[LiveAudioPlayer] Warm-up error:", e);
     }
+  }
+
+  public getContext(): AudioContext | null {
+    return this.ctx;
+  }
+
+  public getMasterGain(): GainNode | null {
+    return this.masterGainNode;
   }
 
   public async resume(): Promise<boolean> {
@@ -69,6 +114,11 @@ export class LiveAudioPlayer {
     return !this.ctx || this.ctx.state === "suspended";
   }
 
+  public isPlaying(): boolean {
+    if (!this.ctx) return false;
+    return this.nextPlayTime > this.ctx.currentTime || this.activeSources.length > 0;
+  }
+
   public enqueueChunk(base64Pcm: string, sampleRate = 24000): void {
     if (!this.ctx || this.ctx.state === "closed") {
       this.warmUp();
@@ -80,16 +130,36 @@ export class LiveAudioPlayer {
     }
 
     try {
-      const binary = window.atob(base64Pcm);
-      const len = binary.length;
-      if (len < 2) return;
+      const binary = typeof globalThis.atob !== "undefined"
+        ? globalThis.atob(base64Pcm)
+        : Buffer.from(base64Pcm, "base64").toString("binary");
+      const incomingLen = binary.length;
+      if (incomingLen === 0) return;
 
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
+      const hasRemainder = this.remainderByte !== null;
+      const totalBytesLen = incomingLen + (hasRemainder ? 1 : 0);
+
+      const bytes = new Uint8Array(totalBytesLen);
+      let offset = 0;
+      if (hasRemainder) {
+        bytes[0] = this.remainderByte!;
+        offset = 1;
+        this.remainderByte = null;
       }
 
-      const numSamples = Math.floor(len / 2);
+      for (let i = 0; i < incomingLen; i++) {
+        bytes[offset + i] = binary.charCodeAt(i);
+      }
+
+      // If total bytes is odd, preserve trailing byte for next incoming chunk to maintain 16-bit alignment
+      const isOdd = totalBytesLen % 2 !== 0;
+      if (isOdd) {
+        this.remainderByte = bytes[totalBytesLen - 1]!;
+      }
+
+      const numSamples = Math.floor(totalBytesLen / 2);
+      if (numSamples === 0) return;
+
       const int16 = new Int16Array(bytes.buffer, 0, numSamples);
       const float32 = new Float32Array(numSamples);
 
@@ -103,16 +173,29 @@ export class LiveAudioPlayer {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
 
-      // Connect source to destination for audible playback
-      source.connect(ctx.destination);
-
-      // Also connect to analyser for visualizer
-      if (this.analyser) {
-        source.connect(this.analyser);
+      // Connect source to masterGainNode (which feeds hardware speakers, visualizer, and session recorder)
+      if (this.masterGainNode) {
+        source.connect(this.masterGainNode);
+      } else {
+        source.connect(ctx.destination);
+        if (this.analyser) source.connect(this.analyser);
       }
 
       const now = ctx.currentTime;
-      const startTime = Math.max(now, this.nextPlayTime);
+      // If queue is idle/initial (nextPlayTime === 0) or ran dry (underrun):
+      // - Initial turn start or genuine underrun (> 80ms gap): prime 150ms jitter buffer
+      // - Micro-jitter (<= 80ms gap): schedule immediately at now with zero stutter
+      // NEVER clamp nextPlayTime backwards: that causes newer audio to play concurrently
+      // on top of uncompleted earlier buffers, creating overlapping voices.
+      if (this.nextPlayTime === 0 || this.nextPlayTime < now) {
+        if (this.nextPlayTime === 0 || now - this.nextPlayTime > LiveAudioPlayer.GAP_THRESHOLD_SECS) {
+          this.nextPlayTime = now + LiveAudioPlayer.JITTER_BUFFER_SECS;
+        } else {
+          this.nextPlayTime = now;
+        }
+      }
+
+      const startTime = this.nextPlayTime;
       source.start(startTime);
       this.nextPlayTime = startTime + audioBuffer.duration;
 
@@ -139,8 +222,9 @@ export class LiveAudioPlayer {
       }
     }
     this.activeSources = [];
+    this.remainderByte = null;
     if (this.ctx) {
-      this.nextPlayTime = this.ctx.currentTime;
+      this.nextPlayTime = 0;
     }
   }
 
@@ -160,10 +244,19 @@ export class LiveAudioPlayer {
 
   public close(): void {
     this.interrupt();
+    if (this.masterGainNode) {
+      try { this.masterGainNode.disconnect(); } catch {}
+      this.masterGainNode = null;
+    }
+    if (this.analyser) {
+      try { this.analyser.disconnect(); } catch {}
+      this.analyser = null;
+    }
     if (this.ctx && this.ctx.state !== "closed") {
       this.ctx.close().catch(() => {});
       this.ctx = null;
     }
+    this.nextPlayTime = 0;
   }
 }
 
@@ -185,7 +278,9 @@ export function float32ToBase64PCM(input: Float32Array): string {
     const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
     binary += String.fromCharCode.apply(null, chunk as any);
   }
-  return window.btoa(binary);
+  return typeof globalThis.btoa !== "undefined"
+    ? globalThis.btoa(binary)
+    : Buffer.from(binary, "binary").toString("base64");
 }
 
 // Downsample Float32Array to 16kHz
@@ -218,6 +313,8 @@ function calculateRms(samples: Float32Array): number {
 export class LiveMicrophoneRecorder {
   private mediaStream: MediaStream | null = null;
   private audioCtx: AudioContext | null = null;
+  private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private silentGainNode: GainNode | null = null;
   private processorNode: ScriptProcessorNode | null = null;
   private onPcmData: (base64Pcm: string) => void;
   private currentVolume = 0;
@@ -240,18 +337,33 @@ export class LiveMicrophoneRecorder {
       });
     }
 
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioCtx = getAudioContextClass();
+    if (!AudioCtx) throw new Error("AudioContext not supported in this environment");
     this.audioCtx = new AudioCtx();
+
     if (this.audioCtx.state === "suspended") {
       await this.audioCtx.resume();
     }
 
-    const source = this.audioCtx.createMediaStreamSource(this.mediaStream);
+    // Auto-resume if browser suspends AudioContext during long silence
+    this.audioCtx.onstatechange = () => {
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        console.log("[LiveMicrophoneRecorder] AudioContext suspended by browser. Auto-resuming...");
+        this.audioCtx.resume().catch(() => {});
+      }
+    };
+
+    // Store sourceNode on class instance to prevent V8/WebKit garbage collection during silence
+    this.sourceNode = this.audioCtx.createMediaStreamSource(this.mediaStream);
 
     // Buffer size 2048 gives ~42ms low latency at 48kHz
     this.processorNode = this.audioCtx.createScriptProcessor(2048, 1, 1);
 
     this.processorNode.onaudioprocess = (e) => {
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+
       const inputData = e.inputBuffer.getChannelData(0);
       this.currentVolume = calculateRms(inputData);
 
@@ -262,23 +374,49 @@ export class LiveMicrophoneRecorder {
       this.onPcmData(base64);
     };
 
-    source.connect(this.processorNode);
+    this.sourceNode.connect(this.processorNode);
 
-    // Mute local feedback
-    const silentGain = this.audioCtx.createGain();
-    silentGain.gain.value = 0;
-    this.processorNode.connect(silentGain);
-    silentGain.connect(this.audioCtx.destination);
+    // Mute local feedback - store gainNode on class instance to prevent GC
+    this.silentGainNode = this.audioCtx.createGain();
+    this.silentGainNode.gain.value = 0;
+    this.processorNode.connect(this.silentGainNode);
+    this.silentGainNode.connect(this.audioCtx.destination);
+  }
+
+  public getMediaStream(): MediaStream | null {
+    return this.mediaStream;
   }
 
   public getVolumeLevel(): number {
     return this.currentVolume;
   }
 
+  public async resume(): Promise<boolean> {
+    if (this.audioCtx && this.audioCtx.state === "suspended") {
+      try {
+        await this.audioCtx.resume();
+        console.log("[LiveMicrophoneRecorder] Resumed AudioContext");
+        return true;
+      } catch (e) {
+        console.warn("[LiveMicrophoneRecorder] Resume failed:", e);
+        return false;
+      }
+    }
+    return true;
+  }
+
   public stop(): void {
+    if (this.sourceNode) {
+      this.sourceNode.disconnect();
+      this.sourceNode = null;
+    }
     if (this.processorNode) {
       this.processorNode.disconnect();
       this.processorNode = null;
+    }
+    if (this.silentGainNode) {
+      this.silentGainNode.disconnect();
+      this.silentGainNode = null;
     }
     if (this.audioCtx && this.audioCtx.state !== "closed") {
       this.audioCtx.close().catch(() => {});
@@ -289,5 +427,171 @@ export class LiveMicrophoneRecorder {
       this.mediaStream = null;
     }
     this.currentVolume = 0;
+  }
+}
+
+/**
+ * Dual-Track Session Audio Recorder
+ * - Dynamically negotiates supported browser codec (.webm on Chromium, .m4a on Safari)
+ * - Mixes candidate microphone and AI interviewer audio inside native Web Audio DSP graph
+ * - Enforces 2-second timeslice chunk streaming for background-tab throttling immunity
+ */
+export class SessionAudioRecorder {
+  private recorder: MediaRecorder | null = null;
+  private chunks: Blob[] = [];
+  private audioCtx: AudioContext | null = null;
+  private mixerDestination: MediaStreamAudioDestinationNode | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
+  private micGain: GainNode | null = null;
+  private aiGain: GainNode | null = null;
+  private chosenMime = "audio/webm;codecs=opus";
+  private chosenExt = "webm";
+  private isRecording = false;
+
+  constructor() {
+    this.detectSupportedMime();
+  }
+
+  private detectSupportedMime(): void {
+    const MIME_CANDIDATES = [
+      { type: "audio/webm;codecs=opus", ext: "webm" },
+      { type: "audio/webm", ext: "webm" },
+      { type: "audio/mp4", ext: "m4a" },
+      { type: "audio/aac", ext: "m4a" },
+      { type: "audio/ogg;codecs=opus", ext: "ogg" },
+      { type: "audio/wav", ext: "wav" },
+    ];
+
+    if (typeof window !== "undefined" && typeof MediaRecorder !== "undefined") {
+      for (const candidate of MIME_CANDIDATES) {
+        if (MediaRecorder.isTypeSupported(candidate.type)) {
+          this.chosenMime = candidate.type;
+          this.chosenExt = candidate.ext;
+          console.log(`[SessionAudioRecorder] Selected native audio codec: ${candidate.type} (.${candidate.ext})`);
+          return;
+        }
+      }
+    }
+  }
+
+  public getExtension(): string {
+    return this.chosenExt;
+  }
+
+  public getMimeType(): string {
+    return this.chosenMime;
+  }
+
+  public start(micStream: MediaStream, player: LiveAudioPlayer): void {
+    if (this.isRecording) return;
+
+    try {
+      const playerCtx = player.getContext();
+      const AudioCtx = getAudioContextClass();
+      this.audioCtx = playerCtx || (AudioCtx ? new AudioCtx() : null);
+      if (!this.audioCtx) return;
+
+      if (this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+
+      // Create shared session mixer destination
+      this.mixerDestination = this.audioCtx.createMediaStreamDestination();
+
+      // Route 1: Microphone stream with 1.05x gain
+      this.micSource = this.audioCtx.createMediaStreamSource(micStream);
+      this.micGain = this.audioCtx.createGain();
+      this.micGain.gain.value = 1.05;
+      this.micSource.connect(this.micGain);
+      this.micGain.connect(this.mixerDestination);
+
+      // Route 2: AI Player master output with 0.95x gain headroom
+      const aiMasterGain = player.getMasterGain();
+      if (aiMasterGain) {
+        this.aiGain = this.audioCtx.createGain();
+        this.aiGain.gain.value = 0.95;
+        aiMasterGain.connect(this.aiGain);
+        this.aiGain.connect(this.mixerDestination);
+      }
+
+      // Initialize MediaRecorder on the mixed destination stream
+      const options: MediaRecorderOptions = {};
+      if (this.chosenMime) {
+        options.mimeType = this.chosenMime;
+      }
+
+      this.chunks = [];
+      this.recorder = new MediaRecorder(this.mixerDestination.stream, options);
+
+      this.recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.chunks.push(e.data);
+        }
+      };
+
+      // 2000ms timeslice guarantees continuous chunk flushing even in backgrounded tabs
+      this.recorder.start(2000);
+      this.isRecording = true;
+      console.log("[SessionAudioRecorder] Active recording started with codec:", this.chosenMime);
+    } catch (err) {
+      console.warn("[SessionAudioRecorder] Failed to start recording session:", err);
+    }
+  }
+
+  public setMute(isMuted: boolean): void {
+    if (this.micGain && this.audioCtx) {
+      this.micGain.gain.setValueAtTime(isMuted ? 0 : 1.05, this.audioCtx.currentTime);
+    }
+  }
+
+  public stop(): Promise<{ blob: Blob; mimeType: string; extension: string }> {
+    return new Promise((resolve) => {
+      if (!this.recorder || this.recorder.state === "inactive") {
+        const finalBlob = new Blob(this.chunks, { type: this.chosenMime });
+        this.cleanup();
+        return resolve({ blob: finalBlob, mimeType: this.chosenMime, extension: this.chosenExt });
+      }
+
+      const onStopHandler = () => {
+        const finalBlob = new Blob(this.chunks, { type: this.chosenMime });
+        this.cleanup();
+        resolve({ blob: finalBlob, mimeType: this.chosenMime, extension: this.chosenExt });
+      };
+
+      this.recorder.onstop = onStopHandler;
+
+      try {
+        this.recorder.stop();
+      } catch {
+        onStopHandler();
+      }
+    });
+  }
+
+  public flush(): { blob: Blob; mimeType: string; extension: string } | null {
+    if (this.chunks.length === 0) return null;
+    return {
+      blob: new Blob(this.chunks, { type: this.chosenMime }),
+      mimeType: this.chosenMime,
+      extension: this.chosenExt,
+    };
+  }
+
+  private cleanup(): void {
+    this.isRecording = false;
+    if (this.micSource) {
+      try { this.micSource.disconnect(); } catch {}
+      this.micSource = null;
+    }
+    if (this.micGain) {
+      try { this.micGain.disconnect(); } catch {}
+      this.micGain = null;
+    }
+    if (this.aiGain) {
+      try { this.aiGain.disconnect(); } catch {}
+      this.aiGain = null;
+    }
+    this.mixerDestination = null;
+    this.recorder = null;
   }
 }

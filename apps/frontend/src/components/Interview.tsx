@@ -9,15 +9,24 @@ import { cn } from "@/lib/utils";
 
 type Status = "idle" | "connecting" | "live" | "reconnecting" | "ending" | "error";
 
+function formatLiveModelName(model: string): string {
+  if (!model) return "Gemini Live Audio";
+  if (model === "gemini-3.8-live") return "Gemini 3.8 Live";
+  if (model.includes("flash-live") || model.includes("live-preview")) return "Gemini Live Audio";
+  return model.replace(/^gemini-/, "Gemini ").replace(/-/g, " ");
+}
+
 export function Interview() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<Status>("idle");
+  const statusRef = useRef<Status>("idle");
+  statusRef.current = status;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiLevel, setAiLevel] = useState(0);
   const [userLevel, setUserLevel] = useState(0);
-  const [activeModel, setActiveModel] = useState<string>("gemini-3.1-flash-live-preview");
+  const [activeModel, setActiveModel] = useState<string>("gemini-3.8-live");
   const [liveCaption, setLiveCaption] = useState<string>("");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
@@ -29,6 +38,7 @@ export function Interview() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isEndingRef = useRef(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pre-join Mic Test State
   const [isTestingMic, setIsTestingMic] = useState(false);
@@ -119,6 +129,19 @@ export function Interview() {
     setTestVolume(0);
   };
 
+  const startHeartbeat = (ws: WebSocket) => {
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN && !isEndingRef.current) {
+        try {
+          ws.send(JSON.stringify({ type: "ping" }));
+        } catch (e) {
+          console.warn("[Interview] Heartbeat send failed:", e);
+        }
+      }
+    }, 15000);
+  };
+
   // Auto-reconnect loop (up to 10 attempts / 30 seconds)
   const attemptReconnect = (attempt = 1) => {
     if (isEndingRef.current || !interviewId) return;
@@ -141,11 +164,16 @@ export function Interview() {
 
       socket.onopen = () => {
         console.log(`[Interview] Auto-reconnected to backend on attempt ${attempt}`);
+        startHeartbeat(socket);
       };
 
       socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === "pong") {
+            return;
+          }
 
           if (data.type === "ready" || data.type === "reconnected") {
             if (data.model) setActiveModel(data.model);
@@ -190,7 +218,7 @@ export function Interview() {
       };
 
       socket.onclose = () => {
-        if (!isEndingRef.current && status !== "error") {
+        if (!isEndingRef.current && statusRef.current === "reconnecting") {
           reconnectTimeoutRef.current = setTimeout(() => {
             attemptReconnect(attempt + 1);
           }, 2500);
@@ -223,6 +251,11 @@ export function Interview() {
     setReconnectAttempt(0);
 
     try {
+      if (socketRef.current) {
+        try { socketRef.current.close(); } catch {}
+        socketRef.current = null;
+      }
+
       const player = new LiveAudioPlayer();
       player.warmUp();
       playerRef.current = player;
@@ -233,11 +266,16 @@ export function Interview() {
 
       socket.onopen = () => {
         console.log("[Interview] WebSocket connected to backend");
+        startHeartbeat(socket);
       };
 
       socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === "pong") {
+            return;
+          }
 
           if (data.type === "ready" || data.type === "reconnected") {
             if (data.model) setActiveModel(data.model);
@@ -298,7 +336,7 @@ export function Interview() {
       };
 
       socket.onclose = () => {
-        if (!isEndingRef.current && status === "live") {
+        if (!isEndingRef.current && (statusRef.current === "live" || statusRef.current === "connecting")) {
           console.log("[Interview] Connection dropped unexpectedly. Initiating auto-reconnect...");
           attemptReconnect(1);
         }
@@ -331,6 +369,10 @@ export function Interview() {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
     }
     stopMicTest(false);
     if (timerIntervalRef.current) {
@@ -427,7 +469,7 @@ export function Interview() {
 
         <div className="flex items-center gap-3">
           <span className="rounded-full bg-secondary/80 px-2.5 py-1 text-xs text-muted-foreground">
-            ⚡ {activeModel}
+            ⚡ {formatLiveModelName(activeModel)}
           </span>
         </div>
       </header>

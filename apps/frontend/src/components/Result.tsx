@@ -71,10 +71,29 @@ export function Result() {
   });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Transcript Search & Filtering
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "Assistant" | "User">("all");
+
+  const handleRetry = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/v1/result/${interviewId}`);
+      setResult(response.data);
+      if (response.data.status === "COMPLETED" || response.data.status === "Done") {
+        setLoading(false);
+      } else if (response.data.status === "FAILED") {
+        setFetchError("Evaluation encountered an issue while grading. Click retry to regenerate your scorecard.");
+        setLoading(false);
+      }
+    } catch {
+      setFetchError("Failed to retry evaluation. Please check backend connection.");
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let intervalId: any = null;
@@ -86,6 +105,11 @@ export function Result() {
         setResult(data);
 
         if (data.status === "COMPLETED" || data.status === "Done") {
+          setLoading(false);
+          setFetchError(null);
+          if (intervalId) clearInterval(intervalId);
+        } else if (data.status === "FAILED") {
+          setFetchError("Evaluation encountered an issue while grading. Click retry to regenerate your scorecard.");
           setLoading(false);
           if (intervalId) clearInterval(intervalId);
         }
@@ -208,7 +232,14 @@ export function Result() {
         </div>
       </header>
 
-      {!ready ? (
+      {fetchError ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-destructive/40 bg-destructive/10 py-16 text-center backdrop-blur">
+          <p className="text-base font-semibold text-destructive">{fetchError}</p>
+          <Button variant="outline" size="sm" onClick={handleRetry} className="gap-2">
+            Retry Evaluation
+          </Button>
+        </div>
+      ) : !ready ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-card/40 py-28 text-center backdrop-blur">
           <div className="grid size-14 place-items-center rounded-2xl bg-secondary/80 text-violet-400">
             <Loader2 className="size-7 animate-spin" />

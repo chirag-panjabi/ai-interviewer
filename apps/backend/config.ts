@@ -17,7 +17,7 @@ function getEnv(key: string, defaultValue?: string): string {
 export const config = {
   DATABASE_URL: getEnv("DATABASE_URL"),
   GEMINI_API_KEY: getEnv("GEMINI_API_KEY"),
-  GEMINI_LIVE_MODEL: getEnv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"),
+  GEMINI_LIVE_MODEL: getEnv("GEMINI_LIVE_MODEL", "gemini-3.8-live"),
   GEMINI_EVAL_MODEL: getEnv("GEMINI_EVAL_MODEL", "gemini-flash-latest"),
   GITHUB_TOKEN: process.env.GITHUB_TOKEN || undefined,
   PORT: parseInt(getEnv("PORT", "3001"), 10),

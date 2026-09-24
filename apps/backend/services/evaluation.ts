@@ -64,37 +64,6 @@ export async function calculateResult(
     };
   }
 
-  // Handle truncated / ultra-short sessions (< 3 candidate answers)
-  if (userMessages.length < 3) {
-    const truncatedResult: EvaluationResult = {
-      overallScore: 2.5,
-      recommendation: "No Hire",
-      summary: `Interview session was truncated or ended prematurely after only ${userMessages.length} candidate response(s). Insufficient technical data was gathered to evaluate systems depth or problem solving.`,
-      categories: {
-        technicalAccuracy: { score: 2.5, feedback: "Insufficient responses to gauge technical accuracy." },
-        problemSolving: { score: 2.5, feedback: "Session concluded before algorithmic or design problem solving could be assessed." },
-        communication: { score: 3.5, feedback: "Brief participation recorded." },
-        depth: { score: 2.0, feedback: "Did not engage in deep architecture or trade-off discussions." },
-      },
-      strengths: [
-        "Connected to the technical interview session.",
-      ],
-      improvements: [
-        "Participate in full multi-question interview session to demonstrate systems architecture and problem-solving depth.",
-      ],
-      evidence: userMessages.slice(0, 2).map((m) => ({
-        quote: m.message,
-        assessment: "Brief answer recorded before interview was ended.",
-      })),
-    };
-
-    return {
-      score: truncatedResult.overallScore,
-      feedback: truncatedResult.summary,
-      evaluationData: truncatedResult,
-    };
-  }
-
   const transcriptFormatted = conversations
     .map((c) => `[${c.type}]: ${c.message}`)
     .join("\n\n");

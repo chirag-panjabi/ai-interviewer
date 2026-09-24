@@ -3,8 +3,15 @@ import { prisma } from "../db";
 import { config } from "../config";
 
 interface ClientMessage {
-  type: "audio" | "end" | "ping";
+  type: "audio" | "end" | "ping" | "auth";
   pcm?: string; // Base64-encoded 16kHz mono 16-bit PCM
+  apiKey?: string;
+}
+
+function maskKey(key?: string): string {
+  if (!key) return "hosted-default";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
 interface ActiveSession {
@@ -23,7 +30,8 @@ interface ActiveSession {
 
 const activeSessions = new Map<string, ActiveSession>();
 
-export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
+export function handleGeminiLiveSession(clientWs: any, interviewId: string, customApiKey?: string) {
+  let activeApiKey = customApiKey?.trim() || config.GEMINI_API_KEY;
   // Check if an existing session is still in grace period for this interviewId
   const existingSession = activeSessions.get(interviewId);
   if (existingSession && existingSession.isSessionActive && existingSession.geminiWs?.readyState === WsClient.OPEN) {
@@ -100,12 +108,15 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
       let hasValidRepos = false;
       let candidateProfileSummary = "No public GitHub repositories or profile details provided.";
       let candidateDisplayName = "Candidate";
+      let chosenRepoName: string | null = null;
 
       if (interview.githubMetadata) {
         try {
           const meta = typeof interview.githubMetadata === "string" 
             ? JSON.parse(interview.githubMetadata) 
             : interview.githubMetadata;
+
+          chosenRepoName = meta.selectedRepo || null;
 
           // Clean display name so speech synthesis doesn't say "dash" or "underscore"
           const rawName = meta.name || meta.username || "Candidate";
@@ -127,7 +138,7 @@ export function handleGeminiLiveSession(clientWs: any, interviewId: string) {
             candidateProfileSummary = `Candidate Username: ${meta.username || "Candidate"}
 Candidate Spoken Name: ${candidateDisplayName}
 Bio: ${meta.bio || "None provided"}
-Public Repositories:
+${chosenRepoName ? `Target Selected Repository for In-Depth Discussion: "${chosenRepoName}"\n` : ""}Public Repositories:
 ${reposList}`;
           }
         } catch {
@@ -163,7 +174,9 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
 
 ### STRUCTURED 4-PHASE INTERVIEW PROGRESSION:
 - **Phase 1: Grounding & Architecture (Turns 1-2)**:
-  ${hasValidRepos 
+  ${chosenRepoName 
+    ? `Greet ${candidateDisplayName} briefly (1 sentence), explicitly cite their selected project "${chosenRepoName}" from their GitHub, and ask a targeted question about its architecture, technical trade-offs, and key design decisions.`
+    : hasValidRepos 
     ? `Greet ${candidateDisplayName} briefly (1 sentence), cite ONE specific project from their GitHub, and ask a targeted question about its architecture and design goals.` 
     : `Greet ${candidateDisplayName} briefly (1 sentence), ask what language/domain they specialize in (backend, distributed systems, fullstack), and propose a realistic system scenario to explore.`}
 - **Phase 2: Deep Component Flow & Data Decisions (Turns 3-4)**:
@@ -173,10 +186,14 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
 - **Phase 4: Fundamental CS & Algorithmic Trade-offs (Turns 7+)**:
   - Probe core computer science principles: time/space complexity, locking strategies, indexing internals, or concurrency primitives.`;
 
-      const host = "generativelanguage.googleapis.com";
-      const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${config.GEMINI_API_KEY}`;
+      if (!activeApiKey) {
+        throw new Error("No Gemini API key available for live audio session.");
+      }
 
-      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId}`);
+      const host = "generativelanguage.googleapis.com";
+      const uri = `wss://${host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${activeApiKey}`;
+
+      console.log(`[GeminiLive] Opening WebSocket to Gemini Live (${modelName}) for interview: ${interviewId} [Key: ${maskKey(activeApiKey)}]`);
       geminiWs = new WsClient(uri);
       sessionObj.geminiWs = geminiWs;
 
@@ -220,7 +237,9 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
             
             activeClientWs.send(JSON.stringify({ type: "ready", model: modelName }));
 
-            const openingTurnText = hasValidRepos
+            const openingTurnText = chosenRepoName
+              ? `Hello Alex! I am ready for the technical screen. I would like to focus on my project "${chosenRepoName}". Please introduce yourself and ask your first question.`
+              : hasValidRepos
               ? `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question based on my featured GitHub project.`
               : `Hello Alex! I am ready for the technical screen. Please introduce yourself and ask your first question.`;
 
@@ -431,6 +450,12 @@ ${hasValidRepos ? "The candidate has public repositories listed above." : "NOTE:
 
       try {
         const msg: ClientMessage = JSON.parse(rawMsg.toString());
+
+        if (msg.type === "auth" && msg.apiKey) {
+          activeApiKey = msg.apiKey.trim();
+          console.log(`[GeminiLive] Custom BYOK key registered for ${interviewId}: ${maskKey(activeApiKey)}`);
+          return;
+        }
 
         if (msg.type === "audio" && msg.pcm && geminiWs && geminiWs.readyState === WsClient.OPEN) {
           audioChunkCount++;

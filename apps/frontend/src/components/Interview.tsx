@@ -4,6 +4,7 @@ import { Bot, Loader2, PhoneOff, User, Mic, MicOff, AlertCircle, Play, Sparkles 
 import { Button } from "./ui/button";
 import { VoiceOrb } from "./VoiceOrb";
 import { getBackendWsUrl } from "@/lib/config";
+import { getCustomApiKey } from "@/lib/apiKeyStorage";
 import { LiveAudioPlayer, LiveMicrophoneRecorder } from "@/lib/audioProcessor";
 import { cn } from "@/lib/utils";
 
@@ -155,7 +156,10 @@ export function Interview() {
     setStatus("reconnecting");
     setReconnectAttempt(attempt);
 
-    const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
+    const customKey = getCustomApiKey();
+    const wsUrl = getBackendWsUrl(
+      `/api/v1/live/${interviewId}${customKey ? `?apiKey=${encodeURIComponent(customKey)}` : ""}`
+    );
     console.log(`[Interview] Attempting auto-reconnect (${attempt}/10) to ${wsUrl}...`);
 
     try {
@@ -164,6 +168,11 @@ export function Interview() {
 
       socket.onopen = () => {
         console.log(`[Interview] Auto-reconnected to backend on attempt ${attempt}`);
+        if (customKey) {
+          try {
+            socket.send(JSON.stringify({ type: "auth", apiKey: customKey }));
+          } catch (e) {}
+        }
         startHeartbeat(socket);
       };
 
@@ -260,12 +269,20 @@ export function Interview() {
       player.warmUp();
       playerRef.current = player;
 
-      const wsUrl = getBackendWsUrl(`/api/v1/live/${interviewId}`);
+      const customKey = getCustomApiKey();
+      const wsUrl = getBackendWsUrl(
+        `/api/v1/live/${interviewId}${customKey ? `?apiKey=${encodeURIComponent(customKey)}` : ""}`
+      );
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
       socket.onopen = () => {
         console.log("[Interview] WebSocket connected to backend");
+        if (customKey) {
+          try {
+            socket.send(JSON.stringify({ type: "auth", apiKey: customKey }));
+          } catch (e) {}
+        }
         startHeartbeat(socket);
       };
 

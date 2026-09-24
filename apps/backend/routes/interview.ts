@@ -1,25 +1,103 @@
 import { Router } from "express";
+import axios from "axios";
 import { PreInterviewBody } from "../types";
-import { scrapeGithub } from "../services/github";
+import { scrapeGithub, getGithubReposPreview } from "../services/github";
 import { prisma } from "../db";
 import { calculateResult } from "../services/evaluation";
 import { interviewCreationLimiter } from "../middleware/rateLimiter";
 
 export const interviewRouter = Router();
 
-// 1. Ingest GitHub profile and initialize interview (Rate limited to 15 / day / IP)
+// 1. Live Google Gemini API Key Verification (Fast ping check)
+interviewRouter.post("/verify-key", async (req, res) => {
+  const { apiKey } = req.body;
+  if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
+    res.status(400).json({ valid: false, error: "API key cannot be empty." });
+    return;
+  }
+
+  const cleanKey = apiKey.trim();
+  if (cleanKey.length < 15) {
+    res.status(400).json({ valid: false, error: "API key is too short. Expected a valid Google Gemini API key." });
+    return;
+  }
+
+  if (cleanKey.startsWith("sk-") || cleanKey.startsWith("ghp_") || cleanKey.startsWith("gho_")) {
+    res.status(400).json({ valid: false, error: "This looks like an OpenAI or GitHub token. Please provide a Google Gemini API key." });
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`,
+      { timeout: 8000 }
+    );
+
+    if (response.status === 200) {
+      res.json({ valid: true, modelsCount: response.data?.models?.length || 0 });
+      return;
+    }
+
+    res.json({ valid: false, error: "Unexpected response from Google API." });
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const errData = err?.response?.data?.error;
+    const msg = errData?.message || err?.message || "Google rejected this API key.";
+
+    console.warn(`[KeyVerification] Key verification rejected by Google (HTTP ${status || "unknown"}): ${msg}`);
+
+    if (status === 400 || status === 403) {
+      res.json({
+        valid: false,
+        error: `Google rejected this key: ${errData?.message || "Invalid API key"}. Please check your key in Google AI Studio.`,
+      });
+      return;
+    }
+
+    if (status === 429) {
+      res.json({
+        valid: false,
+        error: "Google API rate limit / quota exceeded for this key.",
+      });
+      return;
+    }
+
+    res.json({
+      valid: false,
+      error: `Could not verify key with Google (${msg}).`,
+    });
+  }
+});
+
+// 2. Preview candidate GitHub repositories (Cached, fast response)
+interviewRouter.post("/github-preview", async (req, res) => {
+  const { github } = req.body;
+  if (!github || typeof github !== "string" || !github.trim()) {
+    res.status(400).json({ error: "GitHub profile URL or username is required." });
+    return;
+  }
+
+  try {
+    const preview = await getGithubReposPreview(github.trim());
+    res.json(preview);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to preview GitHub profile" });
+  }
+});
+
+// 3. Ingest GitHub profile & selected project, initialize interview (Rate limited to 15 / day / IP for hosted demo tier)
 interviewRouter.post("/pre-interview", interviewCreationLimiter, async (req, res) => {
   const { success, data } = PreInterviewBody.safeParse(req.body);
 
   if (!success) {
     res.status(400).json({
-      message: "Invalid request body. Expected { github: string }.",
+      message: "Invalid request body. Expected { github: string, selectedRepo?: string }.",
     });
     return;
   }
 
   try {
-    const githubData = await scrapeGithub(data.github);
+    const githubData = await scrapeGithub(data.github, data.selectedRepo);
 
     const interview = await prisma.interview.create({
       data: {
@@ -118,8 +196,9 @@ interviewRouter.get("/result/:interviewId", async (req, res) => {
       data: { status: "EVALUATING" },
     });
 
-    // Run evaluation with Gemini 3.7 Flash
-    const result = await calculateResult(interview.conversations, interview.githubMetadata);
+    // Run evaluation with Gemini (using custom BYOK key if provided)
+    const customApiKey = (req.headers["x-gemini-api-key"] || req.headers["x-api-key"]) as string | undefined;
+    const result = await calculateResult(interview.conversations, interview.githubMetadata, customApiKey);
 
     // Save final structured evaluation
     const updated = await prisma.interview.update({
